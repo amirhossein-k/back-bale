@@ -1,3 +1,4 @@
+import { getUserQuery } from "@/app/api/telegram/user/get/route";
 import { AvailableGroupsResponse, BotGroup } from "@/types/bale";
 
 //src\lib\queryConfig\telegram\Req.ts
@@ -6,10 +7,15 @@ export interface BuildingInfo {        // ← export
     name: string;
     address?: string;
 }
-
+export interface BildingInfo {        // ← export
+    _id: any;
+    managerId: any;
+    chatIdGroup: number;
+}
 export interface StatusResponse {       // ← export
-    role: "user" | "manager" | "none";
+    role: "user" | "manager" | "none" | "modir";
     buildings: BuildingInfo[];
+    bilding?: BildingInfo[];
     mongoUserId: any
 }
 
@@ -29,6 +35,23 @@ export async function getStatusUser(userId: number): Promise<StatusResponse> {
 
     return res.json();
 }
+export async function getUser(userId: number): Promise<getUserQuery> {
+    console.log('getUser')
+    const res = await fetch(`/api/telegram/user/get`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+            // credentials: "include", // اگر نیاز به کوکی دارید
+        });
+
+    if (!res.ok) {
+        throw new Error("خطا در دریافت استوری ها");
+    }
+
+    return res.json();
+}
+
 
 /**
  * دریافت گروه‌های قابل ارسال برای یک مدیر ساختمان

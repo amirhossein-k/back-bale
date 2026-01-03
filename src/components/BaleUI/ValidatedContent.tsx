@@ -2,24 +2,20 @@
 "use client";
 
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { BaleUser, WebAppOpenInvoiceParams } from "@/types/bale";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryConfigUser } from "@/lib/queryConfig/telegram/createQueryConfig";
+import { BaleUser } from "@/types/bale";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 import DashboardAdmin from "../layout/DashboardAdmin/DashboardAdmin";
 import DashboardUser from "../layout/DashboardUser/DashboardUser";
+import DashboardModir from "../layout/DashboardModir/DashboardModir";
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { DateBaleSetAction } from "@/store/Slice/BaleDateSlice";
 
-// ─── Variants (✅ corrected) ──────────────────────────────────────────────
+// ─── Variants (تنها موارد استفاده شده) ──────────────────────
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.12,
-      delayChildren: 0.1,
-    },
+    transition: { staggerChildren: 0.12, delayChildren: 0.1 },
   },
 };
 
@@ -42,7 +38,7 @@ const cardVariants: Variants = {
   },
 };
 
-// ─── Spinner ───────────────────────────────────────────────
+// ─── کامپوننت‌های کوچک ──────────────────────────────────────
 function AnimatedSpinner() {
   const dots = [0, 1, 2];
   return (
@@ -67,115 +63,97 @@ function AnimatedSpinner() {
   );
 }
 
-// ─── Error Card ────────────────────────────────────────────
-function ErrorCard({ message }: { message: string }) {
+function ExpandButton() {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9, x: -20 }}
-      animate={{ opacity: 1, scale: 1, x: 0 }}
-      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center shadow-lg"
+    <motion.button
+      onClick={() => window.Bale?.WebApp?.expand?.()}
+      whileHover={{
+        scale: 1.04,
+        boxShadow: "0 8px 25px rgba(108,71,255,0.35)",
+      }}
+      whileTap={{ scale: 0.96 }}
+      className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition-all"
     >
-      <motion.span
-        className="inline-block text-5xl"
-        animate={{ rotate: [0, -10, 10, -10, 0] }}
-        transition={{ duration: 0.6, ease: "easeInOut" }}
-      >
-        ❌
-      </motion.span>
-      <h3 className="mt-3 text-lg font-semibold text-red-800">
-        خطا در دریافت اطلاعات
-      </h3>
-      <p className="mt-1 text-sm text-red-600">{message}</p>
-    </motion.div>
+      <span className="flex items-center gap-2">
+        <motion.span
+          className="inline-block text-lg"
+          animate={{ rotate: [0, 5, 0, -5, 0] }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        >
+          🖥️
+        </motion.span>
+        باز کردن کامل مینی‌اپ
+      </span>
+    </motion.button>
   );
 }
 
-// ─── Main Component ────────────────────────────────────────
 interface Props {
   user: BaleUser;
   isIframe: boolean;
 }
 
 export default function ValidatedContent({ user, isIframe }: Props) {
-  const [isBaleReady, setIsBaleReady] = useState(false);
-
-  const dispatch = useDispatch();
-
-  const { data, isLoading, error } = useQuery(
-    getQueryConfigUser({
-      queryType: "userFetch",
-      options: { userId: user.id },
-    }),
+  const { role, botState } = useSelector(
+    (state: RootState) => state.dataBale.user,
   );
-  //  buildingId={data.buildings[0]?.id}
-  // userId={user.id}
-  if (data?.mongoUserId) {
-    // redux
-    dispatch(
-      DateBaleSetAction({ buildingId: data.buildings[0].id, userId: user.id }),
-    );
-  }
-  // چک کردن آمادگی Bale SDK
+  const isLoadingRole = role === undefined; // اگر نقش هنوز تنظیم نشده باشد
+  const [showAwaitingMessage, setShowAwaitingMessage] = useState(false);
+
+  const fullName =
+    [user.first_name, user.last_name].filter(Boolean).join(" ") || "کاربر";
+
+  // بررسی وضعیت awaiting_building_name
   useEffect(() => {
-    // اگر SDK از قبل آماده است
-    if (window.Bale?.WebApp) {
-      setIsBaleReady(true);
-      return;
+    if (botState === "awaiting_building_name" && !showAwaitingMessage) {
+      setShowAwaitingMessage(true);
+      // بستن خودکار مینی‌اپ بعد از 3 ثانیه (اختیاری)
+      const timer = setTimeout(() => {
+        if (
+          typeof window !== "undefined" &&
+          (window as any).Bale?.WebApp?.close
+        ) {
+          (window as any).Bale.WebApp.close();
+        }
+      }, 4000);
+      return () => clearTimeout(timer);
     }
+  }, [botState]);
 
-    // گوش دادن به رویداد آماده‌سازی SDK
-    const handleBaleReady = () => {
-      console.log("Bale WebApp API is ready!");
-      setIsBaleReady(true);
-    };
-
-    window.addEventListener("bale-web-app-ready", handleBaleReady);
-
-    // همچنین چک دوره‌ای برای اطمینان
-    const checkInterval = setInterval(() => {
-      if (window.Bale?.WebApp) {
-        console.log("Bale WebApp detected via interval check");
-        setIsBaleReady(true);
-        clearInterval(checkInterval);
-      }
-    }, 100);
-
-    // تایم‌اوت برای جلوگیری از چک بی‌نهایت
-    const timeout = setTimeout(() => {
-      console.warn("Bale WebApp not ready after timeout");
-      clearInterval(checkInterval);
-    }, 5000);
-
-    return () => {
-      window.removeEventListener("bale-web-app-ready", handleBaleReady);
-      clearInterval(checkInterval);
-      clearTimeout(timeout);
-    };
-  }, []);
-
-  if (isBaleReady) {
-    console.log("ready");
-  }
-  console.log(data, "data");
-  if (isLoading) {
+  // اگر در وضعیت awaiting_building_name هستیم، پیام نمایش بده
+  if (showAwaitingMessage) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center">
-        <AnimatedSpinner />
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-4 text-sm text-gray-400"
-        >
-          در حال بارگذاری اطلاعات شما...
-        </motion.p>
+      <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            نیاز به راه‌اندازی مجدد
+          </h2>
+          <p className="text-gray-600 mb-6">
+            لطفاً مینی‌اپ را ببندید و مجدداً ربات را با دستور{" "}
+            <code className="bg-gray-100 px-2 py-1 rounded">/start</code> باز
+            کنید.
+          </p>
+          <button
+            onClick={() => {
+              if ((window as any).Bale?.WebApp?.close) {
+                (window as any).Bale.WebApp.close();
+              } else {
+                alert("لطفاً این صفحه را ببندید و دوباره /start را بزنید.");
+              }
+            }}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-4 rounded-xl transition"
+          >
+            بستن مینی‌اپ
+          </button>
+        </div>
       </div>
     );
   }
-
-  if (error) return <ErrorCard message={error.message} />;
-
   return (
     <motion.div
       variants={containerVariants}
@@ -183,6 +161,7 @@ export default function ValidatedContent({ user, isIframe }: Props) {
       animate="visible"
       className="min-h-screen bg-gradient-to-b from-white via-indigo-50/20 to-white px-4 pb-8 pt-4"
     >
+      {/* دکمه Expand در صورت iframe */}
       <AnimatePresence>
         {isIframe && (
           <motion.div
@@ -190,38 +169,17 @@ export default function ValidatedContent({ user, isIframe }: Props) {
             variants={itemVariants}
             className="mb-6 flex justify-center"
           >
-            <motion.button
-              onClick={() => window.Bale?.WebApp?.expand?.()}
-              whileHover={{
-                scale: 1.04,
-                boxShadow: "0 8px 25px rgba(108,71,255,0.35)",
-              }}
-              whileTap={{ scale: 0.96 }}
-              className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <motion.span
-                  className="inline-block text-lg"
-                  animate={{ rotate: [0, 5, 0, -5, 0] }}
-                  transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  🖥️
-                </motion.span>
-                باز کردن کامل مینی‌اپ
-              </span>
-            </motion.button>
+            <ExpandButton />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* کارت اطلاعات کاربر */}
       <motion.div
         variants={cardVariants}
         className="mx-auto max-w-lg overflow-hidden rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] ring-1 ring-gray-100"
       >
-        <div className="bg-linear-to-r from-indigo-500 via-[#5363f7] to-[#7ad7f3] px-6 py-5">
+        <div className="bg-gradient-to-r from-indigo-500 via-[#5363f7] to-[#7ad7f3] px-6 py-5">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -257,9 +215,7 @@ export default function ValidatedContent({ user, isIframe }: Props) {
             </span>
             <div>
               <p className="text-xs text-gray-400">نام کاربر</p>
-              <p className="text-sm font-medium text-gray-800">
-                {user.first_name} {user.last_name}
-              </p>
+              <p className="text-sm font-medium text-gray-800">{fullName}</p>
             </div>
           </motion.div>
 
@@ -272,16 +228,28 @@ export default function ValidatedContent({ user, isIframe }: Props) {
             </span>
             <div>
               <p className="text-xs text-gray-400">شناسه کاربر</p>
-              <p className="text-sm font-medium text-gray-800 font-mono">
+              <p className="font-mono text-sm font-medium text-gray-800">
                 {user.id}
               </p>
             </div>
           </motion.div>
         </motion.div>
       </motion.div>
+
+      {/* داشبورد بر اساس نقش */}
       <motion.div variants={itemVariants} className="mt-6">
         <AnimatePresence mode="wait">
-          {data?.role === "manager" ? (
+          {isLoadingRole ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex justify-center py-10"
+            >
+              <AnimatedSpinner />
+            </motion.div>
+          ) : role === "admin" ? (
             <motion.div
               key="admin"
               initial={{ opacity: 0, y: 40, scale: 0.97 }}
@@ -291,7 +259,7 @@ export default function ValidatedContent({ user, isIframe }: Props) {
             >
               <DashboardAdmin />
             </motion.div>
-          ) : data?.role === "user" ? (
+          ) : role === "user" ? (
             <motion.div
               key="user"
               initial={{ opacity: 0, y: 40, scale: 0.97 }}
@@ -300,6 +268,16 @@ export default function ValidatedContent({ user, isIframe }: Props) {
               transition={{ type: "spring", stiffness: 180, damping: 20 }}
             >
               <DashboardUser />
+            </motion.div>
+          ) : role === "modir" ? (
+            <motion.div
+              key="modir"
+              initial={{ opacity: 0, y: 40, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 180, damping: 20 }}
+            >
+              <DashboardModir />
             </motion.div>
           ) : (
             <motion.div
@@ -324,6 +302,7 @@ export default function ValidatedContent({ user, isIframe }: Props) {
           )}
         </AnimatePresence>
       </motion.div>
+
       <motion.div
         variants={itemVariants}
         className="mt-8 text-center text-xs text-gray-400"

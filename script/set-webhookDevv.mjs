@@ -3,7 +3,7 @@ import axios from "axios";
 
 async function setWebhook() {
   const BOT_TOKEN = process.env.BOT_TOKEN;
-  const WEBHOOK_URL = "https://dev.marloo.shop/api/telegram";
+  const WEBHOOK_URL = "https://marloo.shop/api/telegram";
 
   try {
     const response = await axios.post(

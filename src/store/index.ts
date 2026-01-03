@@ -15,7 +15,7 @@ import {
 
 import { encryptTransform } from 'redux-persist-transform-encrypt';
 import storage from './storage';
-
+import cartPlanReducer from '@/store/Slice/planeSlice'
 
 const secretKey = process.env.NEXT_PUBLIC_CRYPTO_SECRET_KEY ?? 'secretkey2338wfef@h';
 import BaleDataReducer from '@/store/Slice/BaleDateSlice'
@@ -23,7 +23,7 @@ import BaleDataReducer from '@/store/Slice/BaleDateSlice'
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['baleData'],
+  whitelist: ['baleData', 'cartPlan'],
   transforms: [
     encryptTransform({
       secretKey: secretKey, // حتماً این مقدار را از منبع امن بگیر
@@ -37,8 +37,8 @@ const persistConfig = {
 
 // ترکیب همه ریدوسرها
 const rootReducer = combineReducers({
-  dataBale: BaleDataReducer
-
+  dataBale: BaleDataReducer,
+  cartPlan: cartPlanReducer
 
 
 });

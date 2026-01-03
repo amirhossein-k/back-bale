@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'ساختمان یافت نشد' }, { status: 404 });
         }
 
-        // 3. پاکسازی شماره (حذف + و فاصله)
+        // 3. پاکسازی شماره (حذف + و فاصله)د
         const cleanPhone = phoneNumber.replace(/[\s+\-]/g, '');
 
         // 4. جستجوی کاربر با این شماره
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🏢 مشاهده ساختمان', web_app: { url: `https://dev.marloo.shop/dashboard` } }],
+                        [{ text: '🏢 مشاهده ساختمان', web_app: { url: `https://marloo.shop/dashboard` } }],
                     ],
                 },
             }

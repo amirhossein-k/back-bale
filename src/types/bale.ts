@@ -131,3 +131,71 @@ export interface AvailableGroupsResponse {
 //     callback: (status: "paid" | "failed" | "pending") => void
 //   ) => void;
 // }
+
+
+
+// src/types/bale.ts
+export interface BaleFileLocation {
+    fileId: string;
+    accessHash: string;
+    fileStorageVersion: number;
+}
+
+export interface BaleImage {
+    fileLocation: BaleFileLocation;
+    width: number;
+    height: number;
+    fileSize: number;
+}
+
+export interface BaleAvatar {
+    smallImage: BaleImage;
+    largeImage: BaleImage;
+    fullImage: BaleImage;
+    id: { value: string };
+    date: { value: string };
+}
+
+export interface BaleContactInfo {
+    type: number;
+    longValue: { value: string };
+    title: string;
+}
+
+export interface BaleUserr {
+    id: number;
+    accessHash: string;
+    name: string;
+    sex: number;
+    avatar: BaleAvatar;
+    isBot: boolean;
+    nick: string;
+    ext: Record<string, unknown>;
+    isDeleted: boolean;
+    contactInfo: BaleContactInfo[];
+    puppeteer: number;
+    createdAt: { value: string };
+    exInfo: {
+        exPeerType: number;
+        peerIdentity: number;
+    };
+    botCommands: [];
+    preferredLanguages: [];
+    privacyBarMode: number;
+}
+
+// تابع کمکی برای استخراج شماره تلفن از contactInfo
+export function getPhoneNumberFromBaleUser(user: BaleUserr): string | null {
+    const mobileContact = user.contactInfo.find(
+        (contact) => contact.type === 0 && contact.longValue?.value
+    );
+    if (mobileContact?.longValue?.value) {
+        // مقدار به صورت "989399474456" است، باید به "09399474456" تبدیل شود
+        let phone = mobileContact.longValue.value;
+        if (phone.startsWith("98")) {
+            phone = "0" + phone.slice(2);
+        }
+        return phone;
+    }
+    return null;
+}

@@ -26,3 +26,12 @@ export const MONTHS = [
     'far', 'ordi', 'khor', 'tir', 'mor', 'shahr',
     'mehr', 'aban', 'azar', 'dey', 'bahman', 'esfand'
 ] as const;
+
+type ChargeAbbr = 'charge' | 'electricity' | 'water' | 'Facilities' | 'extra' | 'facilities'
+export const ChargeType_MAP: Record<ChargeAbbr, string> = {
+    'charge': "شارژ ماعیانه", 'electricity': "برق ساختمان", 'water': "هزینه آب", 'Facilities': "امکانات رفاهی", facilities: 'امکانات رفاهی"', 'extra': "خدمات اضافی"
+}
+export const ChargeTypes = ['charge', 'electricity', 'water', 'Facilities', 'facilities', 'extra'] as const;
+export function getPersianChargeName(eng: string): string | undefined {
+    return ChargeType_MAP[eng.toLowerCase() as ChargeAbbr]
+}

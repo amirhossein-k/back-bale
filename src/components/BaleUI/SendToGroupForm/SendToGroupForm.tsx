@@ -74,9 +74,9 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 space-y-5"
+      className="max-w-md mx-auto bg-white  text-black rounded-2xl shadow-xl p-6 space-y-5"
     >
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white text-center">
+      <h2 className="text-2xl font-bold text-black text-center">
         ارسال پیام به گروه
       </h2>
 
@@ -92,11 +92,11 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
         <motion.div
           initial={{ scale: 0.9 }}
           animate={{ scale: 1 }}
-          className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 p-3 rounded-lg text-sm"
+          className="bg-red-100  text-red-700  p-3 rounded-lg text-sm"
         >
           {fetchError?.message || "خطا در دریافت گروه‌ها"}
           {fetchError?.message?.includes("AddGroup_1") === false && (
-            <div className="mt-2 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded">
+            <div className="mt-2 text-xs bg-gray-100  p-2 rounded">
               📌 راهنما: ربات را به گروه اضافه کنید و سپس در آن گروه پیام{" "}
               <code className="bg-gray-200 px-1">AddGroup_1</code> را ارسال
               کنید.
@@ -111,14 +111,14 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
           <motion.div className="space-y-4" variants={containerVariants}>
             {/* اگر گروهی وجود ندارد */}
             {(!groups || groups.length === 0) && (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-4 text-gray-500 ">
                 <p>🔹 هیچ گروهی ثبت نشده است.</p>
                 <p className="text-xs mt-2">
                   اگر گروه یافت نشد لطفا چک کنید ربات در گروه قرار دارد و تمام
                   دسترسی ها را داده اید و سپس یک پیام خالی در گروه خود با این
                   جمله
                   <br />
-                  <code className="bg-gray-200 dark:bg-gray-700 px-1 text-lg">
+                  <code className="bg-gray-200  px-1 text-lg">
                     AddGroup_1
                   </code>{" "}
                   را ارسال کنید.
@@ -129,7 +129,7 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
             {/* انتخاب گروه */}
             {groups && groups.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700  mb-1">
                   گروه مورد نظر
                 </label>
                 <motion.select
@@ -139,7 +139,7 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
                     const group = groups.find((g) => g.chatId === chatId);
                     setSelectedGroup(group || null);
                   }}
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2 border border-gray-300  rounded-lg bg-white  text-gray-900  focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">-- انتخاب کنید --</option>
                   {groups.map((group) => (
@@ -153,7 +153,7 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
 
             {/* متن پیام */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700  mb-1">
                 متن پیام
               </label>
               <motion.textarea
@@ -161,13 +161,13 @@ export default function SendToGroupForm({ buildingId, userId }: Props) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="پیام خود را بنویسید..."
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full p-2 border border-gray-300 text-black rounded-lg bg-white  focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
 
             {/* پیام خطای ارسال */}
             {sendError && (
-              <div className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 p-2 rounded text-sm">
+              <div className="bg-red-100  text-red-700 p-2 rounded text-sm">
                 {sendError}
               </div>
             )}

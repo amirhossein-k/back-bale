@@ -13,6 +13,7 @@ const buildingSchema = new Schema(
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
     inviteCode: { type: String, unique: true, sparse: true }, // کد دعوت یکتا
+    chatIdGroup: { type: Number },
   },
   { timestamps: true },
 );

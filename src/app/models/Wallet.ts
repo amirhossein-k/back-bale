@@ -14,11 +14,11 @@ const WalletSchema = new mongoose.Schema({
         required: true,
     },
     balance: {
-        type: Number,  // موجودی به ریال
+        type: Number,  // موجودی فعلی کیف پول کاربر 
         default: 0,
         min: 0,
     },
-    totalDeposited: {
+    totalDeposited: { //مجموع واریزی
         type: Number,
         default: 0,
     },
@@ -40,6 +40,7 @@ const WalletSchema = new mongoose.Schema({
         enum: ['pending', 'completed', 'failed'],
         default: 'pending',
     },
+
 });
 
 export const Wallet = mongoose.models.Wallet || mongoose.model('Wallet', WalletSchema);

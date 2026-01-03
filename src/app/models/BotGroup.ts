@@ -3,13 +3,18 @@ import mongoose from 'mongoose';
 
 const BotGroupSchema = new mongoose.Schema(
     {
-        chatId: { type: Number, required: true, unique: true },
+        chatId: {
+            type: Number,
+            index: true,
+            required: true, unique: true
+        },
         title: { type: String },
         type: { type: String },
         adminId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true,
+            index: true,
         },
     }
 );

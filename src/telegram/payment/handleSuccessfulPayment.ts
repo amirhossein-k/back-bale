@@ -18,7 +18,7 @@ export async function handleSuccessfulPayment(userMongoId: string, orderId: stri
         $set: { role: 'admin' },
     });
 
-    const miniAppUrl = 'https://dev.marloo.shop/dashboard';
+    const miniAppUrl = 'https://marloo.shop/dashboard';
 
     // 3. ارسال پیام موفقیت با دکمه باز کردن مینی‌اپ
     await bot.telegram.sendMessage(telegramId,

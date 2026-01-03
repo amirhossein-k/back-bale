@@ -15,3 +15,10 @@ declare module 'redux-persist/lib/storage' {
     const storage: any;
     export default storage;
 }
+
+export { }
+declare global {
+    interface String {
+        toPersianDigits(): string
+    }
+}

@@ -41,6 +41,7 @@ interface ModalConfig {
 }
 interface ChargeFormData {
   buildingId: string;
+  adminId: number;
   title: string;
   month: string;
   year: number;
@@ -68,20 +69,44 @@ const MODALS: ModalConfig[] = [
 ];
 // ---------- API Call ----------
 async function submitCharge(data: ChargeFormData) {
-  const response = await fetch("/api/telegram/charges/monthly", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
+  try {
+    console.log("send");
+    const response = await fetch("/api/telegram/charges/monthly", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    console.log(response, "response");
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "خطا در ارسال اطلاعات");
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new Error(
+        `خطای ${response.status}: ${response.statusText}${errorBody ? " - " + errorBody : ""}`,
+      );
+      const error = await response.json();
+      throw new Error(error.message || "خطا در ارسال اطلاعات");
+    }
+    const dataRes = await response.json();
+    return dataRes;
+    //    dataRes: {
+    //     "message": "شارژ با موفقیت ثبت شد",
+    //     "data": {
+    //         "id": "69fb883b80c42b79e2849c3d",
+    //         "title": "charge",
+    //         "month": "far",
+    //         "year": 2026,
+    //         "totalAmount": 5550,
+    //         "dueDate": "2026-06-05T00:00:00.000Z",
+    //         "status": "pending",
+    //         "targetMemberCount": 1
+    //     }
+    // }
+  } catch (error: any) {
+    toast.error(`error: ${error.message}`);
+    console.log("error", error.message);
   }
-
-  return response.json();
 }
 // ---------- تابع کمکی برای استخراج نام کامل ----------
 function getFullName(member: Member): string {
@@ -113,6 +138,7 @@ function Modal({
 
   const [formData, setFormData] = useState<ChargeFormData>({
     buildingId: buildingId || "",
+    adminId: userId,
     title: config.apiTitle,
     month: "far",
     year: new Date().getFullYear(),
@@ -158,6 +184,7 @@ function Modal({
     setFormData((prev) => ({
       ...prev,
       targetMember: selectedMemberIds,
+      adminId: userId,
     }));
   }, [selectedMemberIds]);
 
@@ -303,7 +330,7 @@ function Modal({
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg  dark:bg-gray-800 bg-[#1e2939] rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-lg text-white  bg-[#80b2cf] rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto"
       >
         {/* Close button */}
         <button
@@ -368,14 +395,16 @@ function Modal({
                 سال
               </label>
               <input
-                type="number"
-                value={formData.year}
-                onChange={(e) =>
+                // type="text"
+                value={isNaN(formData.totalAmount) ? "" : String(formData.year)}
+                onChange={(e) => {
+                  const val = e.target.value;
+
                   setFormData((prev) => ({
                     ...prev,
-                    year: parseInt(e.target.value),
-                  }))
-                }
+                    year: val === "" ? 0 : parseInt(e.target.value),
+                  }));
+                }}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 // min="1400"
                 // max="1500"
@@ -392,18 +421,27 @@ function Modal({
             <div className="relative">
               <CircleDollarSignIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                type="number"
-                value={formData.totalAmount}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    totalAmount: parseFloat(e.target.value),
-                  }))
+                type="text"
+                inputMode="numeric" // روی موبایل کیبورد عددی باز کند
+                value={
+                  formData.totalAmount === 0
+                    ? ""
+                    : formData.totalAmount
+                        .toLocaleString("en-US")
+                        .replace(/,/g, ".")
                 }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  // حذف همه کاراکترهای غیرعددی (نقطه، کاما، فاصله، حرف و ...)
+                  const numericString = raw.replace(/[^0-9]/g, "");
+                  const number =
+                    numericString === "" ? 0 : parseInt(numericString, 10);
+                  setFormData((prev) => ({ ...prev, totalAmount: number }));
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="مثال: 500000"
-                min="0"
-                step="1000"
+                // min="0"
+                // step="1000"
                 required
               />
             </div>

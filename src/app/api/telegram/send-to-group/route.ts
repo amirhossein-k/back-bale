@@ -1,4 +1,4 @@
-// app/api/telegram/send-to-group/route.ts
+// src\app\api\telegram\send-to-group\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Telegraf } from 'telegraf';
 
@@ -9,7 +9,6 @@ interface SendMessageRequest {
     userId?: string;
 
 }
-
 // تایپ برای پاسخ
 interface SendMessageResponse {
     success: boolean;
@@ -28,8 +27,7 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(process.env.BOT_TOKEN!, {
     telegram: {
         apiRoot: 'https://tapi.bale.ai',  // آدرس API بله
-        // اختیاری: اگر نیاز به proxy دارید
-        // agent: new HttpsProxyAgent('http://proxy:port')
+
     }
 });
 export async function POST(request: NextRequest) {

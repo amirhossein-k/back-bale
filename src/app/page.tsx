@@ -1,11 +1,13 @@
 "use client";
 
-import BaleMiniApp from "@/components/BaleMiniApp";
+import dynamic from "next/dynamic";
+import LoadingState from "@/components/BaleUI/LoadingState";
+
+const BaleHome = dynamic(() => import("@/components/BaleUI/BaleHome"), {
+  ssr: false,
+  loading: () => <LoadingState />,
+});
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black text-white text-xl">
-      <BaleMiniApp />
-    </div>
-  );
+  return <BaleHome />;
 }

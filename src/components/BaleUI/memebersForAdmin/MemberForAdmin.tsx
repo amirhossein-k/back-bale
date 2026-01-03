@@ -28,7 +28,11 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null); // _id عضو در حال پردازش
-
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   // ── مودال ارسال پیام ───────────────────────────────────
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -88,10 +92,14 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
   };
 
   // ── حذف عضو ────────────────────────────────────────────
-  const handleDelete = async (memberId: string) => {
-    const confirmed = window.confirm("آیا از حذف این عضو اطمینان دارید؟");
-    if (!confirmed) return;
-
+  // تابع جایگزین confirm
+  const requestDelete = (memberId: string, memberName: string) => {
+    setMemberToDelete({ id: memberId, name: memberName });
+    setShowConfirmDelete(true);
+  };
+  const handleDeleteConfirmed = async () => {
+    if (!memberToDelete) return;
+    const memberId = memberToDelete.id;
     setActionLoading(memberId);
     try {
       const res = await fetch(
@@ -105,12 +113,38 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "خطا");
       setMembers((prev) => prev.filter((m) => m._id !== memberId));
+      setShowConfirmDelete(false);
+      setMemberToDelete(null);
     } catch (e: any) {
       alert(e.message);
     } finally {
       setActionLoading(null);
     }
   };
+
+  // const handleDelete = async (memberId: string) => {
+  //   const confirmed = window.confirm("آیا از حذف این عضو اطمینان دارید؟");
+  //   if (!confirmed) return;
+
+  //   setActionLoading(memberId);
+  //   try {
+  //     const res = await fetch(
+  //       `/api/telegram/building/${buildingId}/members/${memberId}`,
+  //       {
+  //         method: "DELETE",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ userId: currentUserId }),
+  //       },
+  //     );
+  //     const data = await res.json();
+  //     if (!res.ok) throw new Error(data.error || "خطا");
+  //     setMembers((prev) => prev.filter((m) => m._id !== memberId));
+  //   } catch (e: any) {
+  //     alert(e.message);
+  //   } finally {
+  //     setActionLoading(null);
+  //   }
+  // };
 
   // ── ارسال پیام ─────────────────────────────────────────
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -203,7 +237,6 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
           {members.length} عضو
         </span>
       </div>
-
       {/* لیست اعضا */}
       <AnimatePresence>
         {members.length === 0 ? (
@@ -270,7 +303,6 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
                   >
                     🔄
                   </motion.button>
-
                   {/* ارسال پیام */}
                   <motion.button
                     onClick={() => openMessageModal(member._id)}
@@ -282,15 +314,17 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
                   >
                     💬
                   </motion.button>
-
                   {/* حذف */}
+
                   <motion.button
-                    onClick={() => handleDelete(member._id)}
-                    disabled={actionLoading === member._id}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="rounded-lg p-2 text-sm transition-colors hover:bg-red-100 disabled:opacity-50"
-                    title="حذف عضو"
+                    onClick={() =>
+                      requestDelete(
+                        member._id,
+                        `${member.userId?.firstName || ""} ${member.userId?.lastName || ""}`.trim() ||
+                          "عضو",
+                      )
+                    }
+                    // ... بقیه پراپ‌ها
                   >
                     🗑️
                   </motion.button>
@@ -300,7 +334,6 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
           </ul>
         )}
       </AnimatePresence>
-
       {/* ── مودال ارسال پیام ────────────────────────────── */}
       <AnimatePresence>
         {showMessageModal && (
@@ -355,7 +388,7 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
                   onChange={(e) => setMessageText(e.target.value)}
                   rows={4}
                   placeholder="متن پیام را وارد کنید..."
-                  className="w-full resize-none rounded-xl border border-gray-200 p-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  className="w-full resize-none rounded-xl border text-black border-gray-200 p-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   required
                 />
 
@@ -396,6 +429,47 @@ export default function MemberForAdmin({ buildingId, currentUserId }: Props) {
                   )}
                 </motion.button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      // اضافه کردن مودال تأیید در انتهای JSX (بعد از مودال ارسال پیام)
+      <AnimatePresence>
+        {showConfirmDelete && memberToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+            onClick={() => setShowConfirmDelete(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl"
+            >
+              <div className="mb-4 text-5xl">⚠️</div>
+              <h3 className="mb-2 text-lg font-bold text-gray-800">حذف عضو</h3>
+              <p className="mb-6 text-sm text-gray-600">
+                آیا از حذف عضو <strong>{memberToDelete.name}</strong> اطمینان
+                دارید؟
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setShowConfirmDelete(false)}
+                  className="rounded-lg bg-gray-200 px-5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-300"
+                >
+                  انصراف
+                </button>
+                <button
+                  onClick={handleDeleteConfirmed}
+                  className="rounded-lg bg-red-500 px-5 py-2 text-sm font-medium text-white transition hover:bg-red-600"
+                >
+                  حذف
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

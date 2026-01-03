@@ -19,6 +19,9 @@ import { sendTelegramNotification } from "@/lib/notifyAdmin";
 import { Wallet } from "@/app/models/Wallet";
 import { Transaction } from "@/app/models/Transaction";
 import MonthlyCharge from "@/app/models/MonthlyCharge";
+import Building from "@/app/models/Building";
+import { ChargePaid } from "./handlers/ChargePaid";
+import { getPersianMonthName } from "@/hooks/database";
 
 const activeChats = new Map<number, number>();
 const editState = new Map<number, "about" | "searching" | "interests" | "name" | "age">();
@@ -41,6 +44,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN!;
 bot.start(startHandler()); // اینجا هندلر استارت جدید
 bot.action('kasb', KasbHandler())
 bot.action('Commission', CommisionHandler())
+
+bot.action(/ChargePaid_ok:(.+)/, ChargePaid())
 
 bot.on('chat_member', async (ctx) => {
     const chat = ctx.chat;
@@ -117,79 +122,495 @@ const messageHandler = async (ctx: Context) => {
 
     // --------- برای پرداخت نهایی شده --------------------
     // -------------                        --------------------
+    const message = (ctx.update as any)?.message
+    const userInfoBuyId = message?.from?.id
+    console.log(userInfoBuyId, 'userInfoBuyId')
     if ((ctx.update as any)?.message?.successful_payment) {
 
-        const message = (ctx.update as any)?.message
-        if (!message?.successful_payment) return;
+        if (!message?.successful_payment) {
+            console.log('dddddddddddddddddddddddddd')
+        };
+
         ///update =>>>> message =>> date : تاریخ 
-        const datePay = message?.date
+        // const datePay = message?.date
         //update =>>>> message =>>>>>  from :من که پرداخت کردم or  chat
-        const userInfoBuyId = message?.from?.id
         //update =>>> successful_payment =>>>> total_amount | invoice_payload: example= order_360594256_1778018078695 | telegram_payment_charge_id : کد پیگیری
-        const payment = (ctx.update as any)?.successful_payment
+        const payment = (ctx.update as any)?.message?.successful_payment
+
         const paymentInfo = {
             amount: payment?.total_amount,
             invoice_payload: payment?.invoice_payload,
             paygiri: payment?.telegram_payment_charge_id
         }
-        // save to database
-        // ------------- // مدیر ساختمان را از روی 
-        // -------------// buldingmember  پیدا کن
-        const telegramId = String(userInfoBuyId);
-        // 1-userID
-        // const { telegramId } = await User.findOne({ telegramId: userInfoBuyId }).select('telegramId')
-        // 2-memberbuildig
-        // const { buildingId } = await BuildingMember.findOne({ userId: UserIDFound }).select('buildingId')
+        console.log(paymentInfo.invoice_payload, 'bot paymentInfo invoice_payload')
+        if (paymentInfo.invoice_payload) {
+            const [order, chatId, DatePay, typeEng, typePer, year, month, chargeId] = paymentInfo.invoice_payload.split('_');
+            // const invoice_payload = order_chatId_Date_typeEng_typePer_year_month_chargeId
+            console.log(chargeId, 'bot chargeId')
+            if (order === 'ordercharge') {
 
-        //کیف پولش پیدا میکنیم
-        const { buildingId } = await Wallet.findOne({ userId: telegramId }).select('buildingId').lean()
-        //  مقدار را به کیف پول مدیر ساختمان واریز میکنیم اما چون  مدیر ربات هنوز پول پرداخت نکرده به مدیر پس وضعیت ان  را 
-        // pending یزاریم
-        if (!buildingId) {
-            throw new Error('کیف پول مقصد وجود ندارد');
+                // id member string
+                const telegramId = String(userInfoBuyId);
+
+                // ========== مرحله 1: پیدا کردن شارژ ==========
+                const charge = await MonthlyCharge.findById(chargeId).lean();
+                if (!charge) throw new Error('شارژ یافت نشد');
+                if (!charge.buildingId) throw new Error('شارژ فاقد buildingId است');
+
+                // ========== مرحله 2: پیدا کردن مدیر ساختمان ==========
+                const building = await Building.findById(charge.buildingId)
+                    .populate('managerId', '_id telegramId')  // ✅ دریافت telegramId از User
+                    .lean()
+                if (!building || !building.managerId) throw new Error('ساختمان یا مدیر یافت نشد');
+                // building.managerId = objectId ===> use Id
+                const managerIdd = building.managerId._id
+                const chatAdminId = building.managerId.telegramId
+
+
+                // ========== مرحله 3: یافتن یا ایجاد کیف پول مدیر (اتمیک) ==========
+                const wallet = await Wallet.findOneAndUpdate(
+                    { userId: managerIdd },
+                    {
+                        $setOnInsert: {
+                            buildingId: charge.buildingId,
+                            balance: 0,
+                            totalDeposited: 0,
+                            totalWithdrawn: 0,
+                            status: 'pending',
+                            createdAt: new Date(),
+                        },
+                        $set: {
+                            updatedAt: new Date()
+                        }
+                    },
+                    {
+                        upsert: true,
+                        returnDocument: 'after',  // ✅ رفع deprecation warning
+                        setDefaultsOnInsert: true
+                    }
+                )
+                // ========== مرحله 4: بروزرسانی موجودی کیف پول مدیر ==========
+                await Wallet.updateOne(
+                    { userId: managerIdd },
+                    {
+                        $inc: {
+                            balance: paymentInfo.amount,
+                            totalDeposited: paymentInfo.amount
+                        },
+                        $set: {
+                            updatedAt: new Date(),
+                            // status: 'completed'
+                        }
+                    }
+                );
+                // ========== مرحله 4: بروزرسانی موجودی کیف پول مدیر ==========
+                // بعد اینکه مدیر ربات پول زد 
+                // await Wallet.updateOne(
+                //     { userId: managerIdd },
+                //     {
+                //         $inc: {
+                //             balance: paymentInfo.amount,
+
+                //         },
+                //         $set: {
+                //             updatedAt: new Date(),
+                //             status: 'completed'
+                //         }
+                //     }
+                // );
+
+                // ========== مرحله 5: بروزرسانی شارژ ماهیانه ==========
+
+                const remainingMembers = charge.targetMember.filter((m: any) => m !== telegramId);
+
+                const newStatus = remainingMembers.length === 0 ? 'completed' : 'partial';
+
+                await MonthlyCharge.findByIdAndUpdate(
+                    chargeId,
+                    {
+                        $pull: { targetMember: telegramId }, $set: {
+                            status: newStatus,
+                            updatedAt: new Date()
+                        }
+                    }
+                );
+
+                // ========== مرحله 6: ثبت تراکنش ==========
+
+                await Transaction.create({
+                    userId: telegramId,
+                    buildingId: charge.buildingId,
+                    amount: paymentInfo.amount,
+                    type: typeEng,
+                    description: `پرداخت ${typePer} ${month}/${year}`,
+                    status: 'completed',
+                    paymentMethod: 'bale_wallet',
+                    referenceId: paymentInfo.paygiri,//کد پیگری
+                    completedAt: DatePay
+                })
+
+                // const keyboardmodir = {
+                //     inline_keyboard: [
+                //         [
+                //             {
+                //                 text: 'پرداخت',
+                //                 callback_data: `Charge_ok:${wallet._id}`,
+                //             }
+                //         ],
+                //     ],
+                //     resize_keyboard: true,
+                // };
+                // managerIdd =id temgram admin notife to modir
+                //پیام به مدیر که شماره کارت ثبت کن اگر نکردی
+                const monthper = getPersianMonthName(month)
+                await ctx.telegram.sendMessage(1616176632,
+                    ` *سلام مدیر بازو*
+            
+                    ممبلغ: ${paymentInfo.amount}
+                    کد پیگیری: ${paymentInfo.paygiri}
+                   
+                    ` +
+                    `به مدیر ان ساختمان پرداخت کن`
+                    , {
+                        parse_mode: 'Markdown',
+                        // reply_markup: keyboardmodir,
+                    });
+
+                // پیام به مدیر ساختمان
+                await ctx.telegram.sendMessage(chatAdminId,
+                    `
+                    کاربر: ${message.from.first_name} 
+                    `+ `✅ *پرداخت ${typePer} ${monthper}/${year} پرداخت شد*\n\n` +
+                    `💰 مبلغ: ${paymentInfo.amount.toLocaleString('fa-IR')} تومان\n` +
+                    `🔗 کد پیگیری: ${paymentInfo.paygiri}\n` +
+                    `*ساعت 24 هر شب  موجودی کیف پول شما به حسابتان واریز میشود*`
+                    , {
+                        parse_mode: 'Markdown',
+
+                    });
+            } else if (order === 'order') {
+                // خرید پلن مدیریت
+                // // ایدی کاربر در بله ===> // userInfoBuyId
+
+                // "invoice_payload": "order_1616176632_1777741299714",
+                // paymentInfo {
+                //         amount: payment?.total_amount,
+                //         invoice_payload: payment?.invoice_payload,
+                //         paygiri: payment?.telegram_payment_charge_id
+                // }
+
+                const invoiceId = payment.invoice_payload
+                // کد پیگری پرداخت
+                const combined = `${invoiceId}_${paymentInfo.paygiri}`;
+
+                if (!invoiceId || !paymentInfo.paygiri) {
+                    console.error('اطلاعات پرداخت ناقص است');
+                    return;
+                }
+
+                // const message = `✅ پرداخت با موفقیت انجام شد با هزینه${paymentInfo.amount}. به پلن ویژه خوش‌آمدید!`
+                // console.log(`successful_payment || ${ctx.message.successful_payment}`)
+                console.log(`💰 پرداخت موفق برای سفارش: ${userInfoBuyId}`);
+                // ✅ 3. پیدا کردن کاربر با telegramId (نه findById)
+                const user = await User.findOne({ telegramId: userInfoBuyId });
+                if (!user) {
+                    console.error(`کاربر با telegramId ${userInfoBuyId} یافت نشد`);
+                    await ctx.reply('❌ کاربر یافت نشد. لطفاً ابتدا ربات را استارت کنید.');
+                    return;
+                }
+                const userDbId = user._id;  // ObjectId معتبر مونگو
+                console.log(user.referredBy, 'user.referredBy ')
+                if (user.referredBy) {
+                    const commissionAmount = 5000; // تومان
+                    // ثبت کمیسیون
+                    await ReferralCommission.create({
+                        referrer: user.referredBy,
+                        referred: user._id,
+                        amount: commissionAmount,
+                        status: 'pending'
+                    });
+                    await User.findByIdAndUpdate(user.referredBy, {
+                        $inc: { pendingCommission: commissionAmount, totalCommission: commissionAmount }
+                    });
+                }
+
+
+                // ذخیره خرید
+                await Purchase.create({
+                    userId: userDbId,
+                    plan: 'management',
+                    amount: paymentInfo.amount,
+                    orderId: combined,
+                    verified: true,
+                    paidAt: new Date(),
+                    paygiri: paymentInfo.paygiri
+                });
+                // 3. ارتقا نقش کاربر به admin
+                user.role = 'admin';
+                user.botState = 'awaiting_building_name'; // شروع فرآیند پرسش نام
+                user.tempBuildingName = undefined;
+                await user.save();
+                // 4. پیام موفقیت + درخواست نام ساختمان
+                await ctx.reply(
+                    `✅ *پرداخت با موفقیت انجام شد!*\nهزینه: ${paymentInfo.amount} تومان\n\n` + `کد پیگیر خرید: ${paymentInfo.paygiri}` +
+                    `به پلن مدیریت خوش آمدید. \nلطفاً **نام ساختمان** خود را وارد کنید:`,
+                    { parse_mode: 'Markdown' }
+                );
+
+
+            } else {
+                return
+            }
+
+
+
         }
-        // ۴. بروزرسانی موجودی‌ها
+    }
+    //////////////////////////////////////////  text ///////////////////////////// 
+    /// action.on('text):
+    // await dbConnect();
+    console.log(ctx, 'text on')
+    const text = message.text?.trim() || '';
 
-        await Wallet.updateOne(
-            { userId: telegramId },
-            { $inc: { balance: paymentInfo.amount }, $set: { updatedAt: new Date() } }
+    const chat = ctx.chat;
 
-        );
-        // ۵. ثبت تراکنش
-        // نوع ان را باید توی =>> invoice_payload  ==> جا بدیم
-        // چون عنوان مختلف تایید پرداخت داریم
-        await Transaction.create({
-            userId: telegramId,
-            buildingId,
-            amount: paymentInfo.amount,
-            type: 'charge',
-            description: 'شارژ ماهیانه',
-            status: 'completed',
-            paymentMethod: 'bale_wallet',
-            referenceId: paymentInfo.paygiri,//کد پیگری
-            completedAt: datePay
-        })
 
-        await MonthlyCharge.updateOne(
-            { buildingId },
-            { $pull: { targetMember: telegramId } }
-        );
+    // پیدا کردن کاربر و وضعیت او
+    const user = await User.findOne({ telegramId: userInfoBuyId });
+    if (!user) return; // اگر کاربر ثبت‌نام نکرده، نادیده گرفته شود
+    console.log(user, 'userrrr')
+    // ─── اعتبارسنجی: متن خالی ─────────────────────────
+    if (!text) {
+        await ctx.reply('⚠️ لطفاً یک متن غیرخالی ارسال کنید.');
+        return;
+    }
 
+    // ─── مرحله ۱: دریافت نام ساختمان ──────────────────
+    if (user.botState === 'awaiting_building_name') {
+        // اعتبارسنجی: حداقل ۲ کاراکتر
+        if (text.length < 2) {
+            await ctx.reply('⚠️ نام ساختمان باید حداقل ۲ حرف باشد.\nلطفاً دوباره وارد کنید:');
+            return;
+        }
+
+        // ذخیره موقت نام ساختمان
+        user.tempBuildingName = text;
+        user.botState = 'awaiting_building_address';
+        await user.save();
+        // const messageId = (ctx.update.update_id);
+        // ctx.deleteMessage(Number(messageId))
         await ctx.reply(
-            `شارژ ماهیانه پرداخت شد\n
-                کد پیگیری: ${paymentInfo.paygiri}
-                زمان: ${datePay}
-                `,
-            { parse_mode: 'Markdown' }
-        );
 
+            `✅ نام ساختمان "${text}" ثبت شد.\n` +
+            'لطفاً **آدرس ساختمان** را وارد کنید:\n'
+
+            , {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'برگشت', callback_data: 'backUser_NameBuild', }],
+
+                    ],
+
+                },
+            }
+        ); return;
+    }
+
+    // ─── مرحله ۲: دریافت آدرس ساختمان ────────────────
+    if (user.botState === 'awaiting_building_address') {
+        const buildingName = user.tempBuildingName;
+        // await ctx.answerCbQuery(); // در نسخه‌های جدیدتر Telegraf
+        console.log('starttttt')
+        console.log(ctx, 'awatinggggg')
+        // const messageId = (ctx.update.update_id);
+        // ctx.deleteMessage(Number(messageId))
+        if (!buildingName) {
+            // حالت غیرمنتظره – بازگشت به مرحله نام
+            user.botState = 'awaiting_building_name';
+            user.tempBuildingName = undefined;
+            await user.save();
+            await ctx.reply('⚠️ خطایی رخ داد. لطفاً دوباره **نام ساختمان** را وارد کنید:');
+            return;
+        }
+        // اعتبارسنجی آدرس
+        if (text.length < 5) {
+            await ctx.reply('⚠️ آدرس ساختمان باید حداقل ۵ حرف باشد.\nلطفاً دوباره وارد کنید:');
+            return;
+        }
+        user.tempBuildingAddress = text;
+        user.botState = 'awaiting_card';
+        // /backUser_AddressBuild
+        await user.save();
+        await ctx.reply(
+            `✅ ادرس ساختمان "${text}" ثبت شد.\n` +
+            'لطفاً **شماره حساب ** جهت دریافت واریزی های اعضا ساختمان را وارد کنید:\n' + `
+            مثال: خط اول: شماره کارت \n
+            خط دوم: اسم صاحب حساب\n
+            603770152153289\n
+            کریمی\n
+            `,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'برگشت', callback_data: 'backUser_AddressBuild', }],
+
+                    ],
+
+                },
+            }
+        ); return;
+
+
+
+    }
+    if (user.botState === 'awaiting_card') {
+        console.log('awaiting_card')
+        // await ctx.answerCbQuery(); // در نسخه‌های جدیدتر Telegraf
+        const messageId = ctx.callbackQuery?.message?.message_id;
+        ctx.deleteMessage(messageId)
+        // پردازش شماره کارت
+        // const text = ctx.message.text.trim();
+        const lines = text.split('\n').map((l: any) => l.trim());
+        const cardNumber = lines[0].replace(/\s/g, '');
+        const fullName = lines.slice(1).join(' ') || undefined;
+
+        // اعتبارسنجی ساده
+        if (cardNumber.length !== 16 || !/^\d{16}$/.test(cardNumber)) {
+            return ctx.reply("شماره کارت معتبر نیست (16 رقم)و کیبورد انگلیسی باشد. لطفاً دوباره ارسال کنید.");
+        }
+
+
+        //اگر در مرحله خرید توسط مدیر بود و خرید انجام شد بعد اینکه ادرس ساختمان زد باید شماره کارت وارد کند 
+        if (user.role === 'admin' && (!user.cardNumber || user.cardNumber.length < 0)) {
+            const buildingName = user.tempBuildingName;
+            const buildingAddress = user.tempBuildingAddress;
+
+            // ⚡ ذخیره موقت وضعیت برای rollback در صورت خطا
+            const previousBotState = user.botState;
+            const previousTempName = user.tempBuildingName;
+            const prevTempId = user.tempBuildingId;
+            const prevTempAdreess = user.tempBuildingAddress;
+
+            try {
+                console.log(`ایجاد ساختمان: 
+                name:${buildingName}, address: ${text} , mangerId : ${user._id}
+                `)
+                // ایجاد ساختمان
+                const Building = (await import('@/app/models/Building')).default;
+                const newBuilding = await Building.create({
+                    name: buildingName,
+                    address: buildingAddress,
+                    managerId: user._id,
+
+                });
+                console.log(`newBuliding : ${newBuilding}`)
+                console.log(`ایجاد BuildingMember: 
+                buildingId:${newBuilding._id}, userId: ${user._id} 
+                `)
+                // اضافه کردن کاربر به عنوان admin-member
+                const BuildingMember = (await import('@/app/models/BuildingMember')).default;
+                await BuildingMember.create({
+                    buildingId: newBuilding._id,
+                    userId: user._id,
+                    role: 'admin',
+                    joinedAt: new Date(),
+                });
+                // ۳) اضافه کردن userId به آرایه members خود ساختمان
+                await Building.findByIdAndUpdate(newBuilding._id, {
+                    $push: { members: user._id },
+                });
+                // ─── موفقیت ────────────────────────────────────────
+                user.nameBuilding = buildingName
+                user.adressBuilding = buildingAddress
+                user.cardNumber = cardNumber
+                user.fullName = fullName
+                // پاک کردن وضعیت موقت
+                user.botState = 'idle';
+                user.tempBuildingName = undefined;
+                user.tempBuildingId = undefined;
+                user.tempBuildingAddress = undefined;
+
+                await user.save();
+                // ارسال پیام نهایی با دکمه داشبورد
+                const miniAppUrl = 'https://marloo.shop/';
+                await ctx.reply(
+                    `✅ *ساختمان با موفقیت ثبت شد!*\n\n` +
+                    `🏢 نام: ${buildingName}\n` +
+                    `📍 آدرس: ${buildingAddress}\n\n` +
+                    `اطلاعات حساب:` + ` شماره حساب: ${cardNumber} به نام: ${fullName}` +
+                    `اکنون می‌توانید از پنل مدیریت استفاده کنید.`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    {
+                                        text: '🚀 رفتن به داشبورد مدیریت',
+                                        web_app: { url: miniAppUrl },
+                                    },
+                                ],
+                            ],
+                        },
+                    }
+                );
+                console.log(`✅ ساختمان "${buildingName}" برای کاربر ${userInfoBuyId} ایجاد شد.`);
+            } catch (error) {
+                // ─── خطا: بازگشت به حالت قبل ────────────────
+                console.error(`❌ خطا در ایجاد ساختمان برای کاربر ${userInfoBuyId}:`, error);
+
+                user.botState = previousBotState;
+                user.tempBuildingName = previousTempName;
+                user.tempBuildingId = prevTempId;
+                user.tempBuildingAddress = prevTempAdreess;
+
+
+                await user.save();
+
+                await ctx.reply(
+                    '❌ متأسفانه در ثبت ساختمان خطایی رخ داد.\n' +
+                    'لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.\n\n' +
+                    'دستور /start را بزنید تا از اول شروع کنید.'
+                );
+            }
+        } else {
+            //اگر کاربر عادی می خواست کسب در امد کنه:
+            // ذخیره در کاربر
+            const updateUser = await User.findByIdAndUpdate(user._id, {
+                cardNumber,
+                fullName,
+                botState: 'idle',
+            },
+                { new: true } // <-- سند جدید رو برگردون
+            );
+            if (!updateUser) {
+                await ctx.reply(
+                    ` از دستور زیر استفاده کنید` +
+                    '(برای اجرا دستور /start را بزنید)',
+                    { parse_mode: 'Markdown' }
+                );
+            }
+            console.log(updateUser, 'updateUser')
+
+
+            // ایجاد درخواست برداشت
+            await createWithdrawalRequest(updateUser, message.chat.id, ctx);
+
+        }
 
 
 
     }
 
 
-    // if(ctx.update)
+    // await ctx.reply(
+    //     `برای مشاهده تمام امکانات` +
+    //     `لطفا از دستور زیر استفاده کنید` +
+    //     '(برای اجرا دستور /start را بزنید)',
+    //     { parse_mode: 'Markdown' }
+    // );
+
+    console.log('eeeeeessssssssssssssssee')
+    //////////////////////////////////////////////
 
     // user info
     // گروه ==> (ctx.update as any)?.message?.chat ==>id,type,title
@@ -222,6 +643,7 @@ const messageHandler = async (ctx: Context) => {
                 { chatId: groupId, title: titleGroup, type: typeGroup, adminId: user._id },
                 { upsert: true }
             );
+            await Building.findOneAndUpdate({ members: user._id }, { chatIdGroup: groupId })
             ctx.reply(`تنظیمات بازو فعال شد✅`);
 
 
@@ -229,6 +651,7 @@ const messageHandler = async (ctx: Context) => {
         }
         //     // بررسی کن ببین کسی که پیام میده ادمین است در دیتا بیس من یا نه
     }
+
     return
 }
 bot.on('message', messageHandler)
@@ -243,69 +666,6 @@ bot.on('pre_checkout_query', async (ctx) => {
 
 bot.on('successful_payment', async (ctx) => {
 
-    // // ایدی کاربر در بله
-    const userId = ctx.chat.id
-    // "invoice_payload": "order_1616176632_1777741299714",
-    const invoiceId = ctx.message?.successful_payment?.invoice_payload;
-    const amount = ctx.message?.successful_payment?.total_amount
-    const telegram_payment_charge_id = ctx.message?.successful_payment?.telegram_payment_charge_id
-    const combined = `${invoiceId}_${telegram_payment_charge_id}`;
-
-    // کد پیگری پرداخت
-    const paygiri = ctx.message?.successful_payment.telegram_payment_charge_id
-    if (!invoiceId || !paygiri) {
-        console.error('اطلاعات پرداخت ناقص است');
-        return;
-    }
-
-    const message = `✅ پرداخت با موفقیت انجام شد با هزینه${amount}. به پلن ویژه خوش‌آمدید!`
-    console.log(`successful_payment || ${ctx.message.successful_payment}`)
-    console.log(`💰 پرداخت موفق برای سفارش: ${userId}`);
-    // ✅ 3. پیدا کردن کاربر با telegramId (نه findById)
-    const user = await User.findOne({ telegramId: userId });
-    if (!user) {
-        console.error(`کاربر با telegramId ${userId} یافت نشد`);
-        await ctx.reply('❌ کاربر یافت نشد. لطفاً ابتدا ربات را استارت کنید.');
-        return;
-    }
-    const userDbId = user._id;  // ObjectId معتبر مونگو
-    console.log(user.referredBy, 'user.referredBy ')
-    if (user.referredBy) {
-        const commissionAmount = 5000; // تومان
-        // ثبت کمیسیون
-        await ReferralCommission.create({
-            referrer: user.referredBy,
-            referred: user._id,
-            amount: commissionAmount,
-            status: 'pending'
-        });
-        await User.findByIdAndUpdate(user.referredBy, {
-            $inc: { pendingCommission: commissionAmount, totalCommission: commissionAmount }
-        });
-    }
-
-
-    // ذخیره خرید
-    await Purchase.create({
-        userId: userDbId,
-        plan: 'management',
-        amount: amount,
-        orderId: combined,
-        verified: true,
-        paidAt: new Date(),
-        paygiri: paygiri
-    });
-    // 3. ارتقا نقش کاربر به admin
-    user.role = 'admin';
-    user.botState = 'awaiting_building_name'; // شروع فرآیند پرسش نام
-    user.tempBuildingName = undefined;
-    await user.save();
-    // 4. پیام موفقیت + درخواست نام ساختمان
-    await ctx.reply(
-        `✅ *پرداخت با موفقیت انجام شد!*\nهزینه: ${amount} تومان\n\n` +
-        `به پلن مدیریت خوش آمدید. لطفاً **نام ساختمان** خود را وارد کنید:`,
-        { parse_mode: 'Markdown' }
-    );
 
 
 
@@ -313,187 +673,77 @@ bot.on('successful_payment', async (ctx) => {
 
 
 // هندلر پیام‌های متنی
-bot.on('text', async (ctx) => {
+// bot.command('backUser_NameBuild', async (ctx) => {
+//     console.log(ctx, 'backUser_NameBuild ffffffffffff')
+
+// });
+// bot.action('backUser_NameBuild', async (ctx) => {
+//     console.log(ctx, 'backUser_NameBuild ffffffffffff action')
+
+// })
+
+// backUser_NameBuild
+bot.action(/^backUser_(.+)$/, async (ctx) => {
+    // console.log(ctx, 'ctx backkkkkk')
+    await ctx.answerCbQuery(); // در نسخه‌های جدیدتر Telegraf
+    const messageId = ctx.update.callback_query.message?.message_id;
+    ctx.deleteMessage(messageId)
+    // await ctx.api.deleteMessage(ctx.chat.id, messageId);
+
     await dbConnect();
-    console.log(ctx, 'text on')
-    const telegramId = ctx.chat.id;
-    const text = ctx.message.text?.trim() || '';
-
-    const chat = ctx.chat;
-
-
-    // پیدا کردن کاربر و وضعیت او
+    const requestId = ctx.match[1];
+    // const telegramId = ctx?.message?.chat.id;
+    const telegramId = ctx.update.callback_query.chat_instance
+    // console.log('startttt')
+    // console.log(telegramId, 'requestIddddd')
+    // console.log(telegramId, 'telegramId')
     const user = await User.findOne({ telegramId });
-    if (!user) return; // اگر کاربر ثبت‌نام نکرده، نادیده گرفته شود
-
-    // ─── اعتبارسنجی: متن خالی ─────────────────────────
-    if (!text) {
-        await ctx.reply('⚠️ لطفاً یک متن غیرخالی ارسال کنید.');
+    if (!user) {
+        await ctx.reply('⚠️ شما هنوز ثبت‌نام نکرده‌اید. از /start استفاده کنید.');
         return;
     }
+    if (user.botState === 'idle') {
+        await ctx.reply('❌ شما در حال انجام هیچ فرایندی نیستید.');
+        return;
+    }
+    if (requestId === 'NameBuild') {
 
-    // ─── مرحله ۱: دریافت نام ساختمان ──────────────────
-    if (user.botState === 'awaiting_building_name') {
-        // اعتبارسنجی: حداقل ۲ کاراکتر
-        if (text.length < 2) {
-            await ctx.reply('⚠️ نام ساختمان باید حداقل ۲ حرف باشد.\nلطفاً دوباره وارد کنید:');
-            return;
-        }
-
-        // ذخیره موقت نام ساختمان
-        user.tempBuildingName = text;
-        user.botState = 'awaiting_building_address';
+        // پاک کردن وضعیت موقت و بازگشت به idle
+        user.botState = 'awaiting_building_name';
+        user.tempBuildingName = undefined;
         await user.save();
 
         await ctx.reply(
-            `✅ نام ساختمان "${text}" ثبت شد.\n` +
-            'لطفاً **آدرس ساختمان** را وارد کنید:\n' +
-            '(برای لغو /cancel را بزنید)'
-        ); return;
-    }
+            `📝 لطفاً **نام ساختمان** خود را وارد کنید:\n`
 
-    // ─── مرحله ۲: دریافت آدرس ساختمان ────────────────
-    if (user.botState === 'awaiting_building_address') {
-        const buildingName = user.tempBuildingName;
-
-        if (!buildingName) {
-            // حالت غیرمنتظره – بازگشت به مرحله نام
-            user.botState = 'awaiting_building_name';
-            user.tempBuildingName = undefined;
-            await user.save();
-            await ctx.reply('⚠️ خطایی رخ داد. لطفاً دوباره **نام ساختمان** را وارد کنید:');
-            return;
-        }
-        // اعتبارسنجی آدرس
-        if (text.length < 5) {
-            await ctx.reply('⚠️ آدرس ساختمان باید حداقل ۵ حرف باشد.\nلطفاً دوباره وارد کنید:');
-            return;
-        }
-
-        // ⚡ ذخیره موقت وضعیت برای rollback در صورت خطا
-        const previousBotState = user.botState;
-        const previousTempName = user.tempBuildingName;
-        const prevTempId = user.tempBuildingId;
-
-        try {
-            console.log(`ایحجاد ساختمان: 
-                name:${buildingName}, address: ${text} , mangerId : ${user._id}
-                `)
-            // ایجاد ساختمان
-            const Building = (await import('@/app/models/Building')).default;
-            const newBuilding = await Building.create({
-                name: buildingName,
-                address: text,
-                managerId: user._id,
-
-            });
-            console.log(`newBuliding : ${newBuilding}`)
-            console.log(`ایحجاد BuildingMember: 
-                buildingId:${newBuilding._id}, userId: ${user._id} 
-                `)
-            // اضافه کردن کاربر به عنوان admin-member
-            const BuildingMember = (await import('@/app/models/BuildingMember')).default;
-            await BuildingMember.create({
-                buildingId: newBuilding._id,
-                userId: user._id,
-                role: 'admin',
-                joinedAt: new Date(),
-            });
-            // ۳) اضافه کردن userId به آرایه members خود ساختمان
-            await Building.findByIdAndUpdate(newBuilding._id, {
-                $push: { members: user._id },
-            });
-            // ─── موفقیت ────────────────────────────────────────
-
-            // پاک کردن وضعیت موقت
-            user.botState = 'idle';
-            user.tempBuildingName = undefined;
-            user.tempBuildingId = undefined;
-
-            await user.save();
-            // ارسال پیام نهایی با دکمه داشبورد
-            const miniAppUrl = 'https://dev.marloo.shop/dashboard';
-            await ctx.reply(
-                `✅ *ساختمان با موفقیت ثبت شد!*\n\n` +
-                `🏢 نام: ${buildingName}\n` +
-                `📍 آدرس: ${text}\n\n` +
-                `اکنون می‌توانید از پنل مدیریت استفاده کنید.`,
-                {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                {
-                                    text: '🚀 رفتن به داشبورد مدیریت',
-                                    web_app: { url: miniAppUrl },
-                                },
-                            ],
-                        ],
-                    },
-                }
-            );
-            console.log(`✅ ساختمان "${buildingName}" برای کاربر ${telegramId} ایجاد شد.`);
-        } catch (error) {
-            // ─── خطا: بازگشت به حالت قبل ────────────────
-            console.error(`❌ خطا در ایجاد ساختمان برای کاربر ${telegramId}:`, error);
-
-            user.botState = previousBotState;
-            user.tempBuildingName = previousTempName;
-            user.tempBuildingId = prevTempId;
-
-            await user.save();
-
-            await ctx.reply(
-                '❌ متأسفانه در ثبت ساختمان خطایی رخ داد.\n' +
-                'لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.\n\n' +
-                'دستور /start را بزنید تا از اول شروع کنید.'
-            );
-        }
-        return;
-
-    }
-    if (user.botState === 'awaiting_card') {
-        console.log('awaiting_card')
-        // پردازش شماره کارت
-        const text = ctx.message.text.trim();
-        const lines = text.split('\n').map(l => l.trim());
-        const cardNumber = lines[0].replace(/\s/g, '');
-        const fullName = lines.slice(1).join(' ') || undefined;
-
-        // اعتبارسنجی ساده
-        if (cardNumber.length !== 16 || !/^\d{16}$/.test(cardNumber)) {
-            return ctx.reply("شماره کارت معتبر نیست (16 رقم). لطفاً دوباره ارسال کنید.");
-        }
-
-        // ذخیره در کاربر
-        const updateUser = await User.findByIdAndUpdate(user._id, {
-            cardNumber,
-            fullName,
-            botState: 'idle',
-        },
-            { new: true } // <-- سند جدید رو برگردون
         );
-        if (!updateUser) {
-            await ctx.reply(
-                ` از دستور زیر استفاده کنید` +
-                '(برای اجرا دستور /start را بزنید)',
-                { parse_mode: 'Markdown' }
-            );
-        }
-        console.log(updateUser, 'updateUser')
-        // ایجاد درخواست برداشت
-        await createWithdrawalRequest(updateUser, ctx.chat.id, ctx);
+
+    }
+    // backUser_AddressBuild
+    else if (requestId === 'AddressBuild') {
+        // پاک کردن وضعیت موقت و بازگشت به idle
+        user.botState = 'awaiting_building_address';
+        user.tempBuildingAddress = undefined;
+        await user.save();
+
+        await ctx.reply(
+            `📝 لطفاً **آدرس ساختمان** (${user.tempBuildingName || ''}) را وارد کنید:\n`,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'برگشت', callback_data: '/backUser_NameBuild', }],
+                    ],
+                    resize_keyboard: true,
+                },
+            }
+        );
+
     }
 
 
-    await ctx.reply(
-        `لطفا از دستور زیر استفاده کنید` +
-        '(برای اجرا دستور /start را بزنید)',
-        { parse_mode: 'Markdown' }
-    );
+
 
 });
-
 // دستور /cancel – بازگشت به idle
 bot.command('cancel', async (ctx) => {
     await dbConnect();
@@ -532,68 +782,7 @@ bot.command('cancel', async (ctx) => {
 });
 
 
-// دریافت تصویر رسید
-bot.on('photo', async (ctx) => {
-    // try {
-    //     await dbConnect()
-    //     // telegramId karbar
-    //     const userId = ctx.from?.id?.toString(); // تبدیل به string
-    //     const photos = ctx.message?.photo;
 
-    //     if (!photos || photos.length === 0) return;
-
-    //     // دریافت بهترین کیفیت تصویر
-    //     const photo = photos[photos.length - 1];
-    //     const fileId = photo.file_id;
-
-    //     // دریافت اطلاعات کاربر از دیتابیس
-    //     const UserInfo = await User.findOne({ telegramId: userId }).select('role _id firstName')
-    //     if (UserInfo.role === 'none') return
-    //     const userBuilding = await BuildingMember.findOne({ userId: UserInfo._id }).select('buildingId');
-
-    //     if (!userBuilding) {
-    //         return ctx.reply('❌ شما عضو هیچ ساختمانی نیستید');
-    //     }
-
-    //     // دریافت متن همراه (اگر وجود داشته باشد)
-    //     const caption = ctx.message?.caption || '';
-
-    //     // استخراج مبلغ از کپشن (اختیاری)
-    //     const amount = extractAmountFromCaption(caption);
-
-    // ذخیره رسید در دیتابیس
-    // const payment = await saveReceiptToBale({
-    //     userId,
-    //     buildingId: userBuilding.buildingId,
-    //     fileId,
-    //     caption,
-    //     chatId: ctx.chat?.id,
-    //     amount,
-
-    // });
-
-    //     await ctx.reply(
-    //         '✅ *رسید شما با موفقیت ثبت شد*\n\n'
-    //         // + `📋 کد پیگیری: ${payment._id}\n`
-    //         + '⏳ پس از تایید ادمین به شما اطلاع داده خواهد شد.',
-    //         { parse_mode: 'Markdown' }
-    //     );
-
-    //     // ارسال نوتیفیکیشن به ادمین‌ها
-    //     await sendTelegramNotification(userBuilding.buildingId, {
-    //         type: 'new_payment_receipt',
-    //         userId,
-    //         paymentId: payment._id,
-    //         fileId,
-    //     }, UserInfo.firstName
-    //     );
-
-
-    // } catch (error) {
-    //     console.error('Error in photo handler:', error);
-    //     await ctx.reply('❌ خطا در ثبت رسید. لطفاً دوباره تلاش کنید.');
-    // }
-});
 
 // هندلر خطا
 bot.catch((err, ctx) => {

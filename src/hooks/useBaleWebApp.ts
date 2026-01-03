@@ -55,7 +55,7 @@ function reducer(state: BaleAppState & { isSDKInitialized: boolean }, action: Ac
             return {
                 ...state,
                 isSDKReady: true,
-                userInfo: DEV_FALLBACK_USER,
+                // userInfo: DEV_FALLBACK_USER,
                 isIframe: false,
                 isValidated: true,
                 validationError: null,

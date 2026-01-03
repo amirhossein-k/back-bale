@@ -1,26 +1,169 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* رنگ‌های اصلی (تم روشن) – مقادیر HSL */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
 }
 
+/* تعریف متغیرهای مستقیم (برای fallback در صورت نیاز) */
+:root {
+  --background-hex: #ffffff;
+  --foreground-hex: #171717;
+}
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --background-hex: #0a0a0a;
+  --foreground-hex: #ededed;
+}
+
+/* @theme inline – برای نگاشت متغیرهای مستقیم به ابزارهای Tailwind */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--background-hex);
+  --color-foreground: var(--foreground-hex);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* --background: #0a0a0a; */
-    --foreground: #ededed;
-  }
+/* @theme – برای نگاشت متغیرهای HSL به ابزارهای Tailwind (برای رنگ‌های پیشرفته) */
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--background-hex);
+  color: var(--foreground-hex);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* تنظیمات اجباری برای react-jalali-picker در موبایل */
+@media (max-width: 768px) {
+  /* کلیه سلول‌های جدول تقویم */
+  .date-picker td,
+  .calendar td,
+  [class*="date-picker"] td,
+  [class*="calendar"] td,
+  .rdp-cell {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  /* دکمه‌های داخل سلول */
+  .date-picker button,
+  .calendar button,
+  [class*="date-picker"] button,
+  [class*="calendar"] button,
+  .rdp-button {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 29px !important;
+    padding: 0 !important;
+  }
+
+  /* سطر عنوان (ماه و سال) */
+  .date-picker .caption,
+  .calendar .caption,
+  .rdp-caption {
+    font-size: 14px !important;
+  }
+
+  /* جدول اصلی */
+  .date-picker table,
+  .calendar table,
+  .rdp-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  /* کل wrapper تقویم */
+  .date-picker,
+  .calendar,
+  [class*="date-picker"],
+  [class*="calendar"] {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+  }
+}
+
+/* در فایل app/globals.css یا هر CSS سراسری */
+@media (max-width: 768px) {
+  .rdp-nav_button {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 22px !important;
+  }
+  .rdp-nav_button svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+/* 
+.prv-btns button,
+.next-btns button {
+  font-size: 29px !important;
+  width: 48px !important;
+  height: 48px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+} */

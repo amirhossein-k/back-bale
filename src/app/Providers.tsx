@@ -1,6 +1,6 @@
-// src\app\Providers.tsx
+// src/app/Providers.tsx
 "use client";
-
+// import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { persistor, store } from "@/store";
 import {
   QueryClient,
@@ -8,10 +8,18 @@ import {
   HydrationBoundary,
   DehydratedState,
 } from "@tanstack/react-query";
-import { useState } from "react";
+import { SessionProvider } from "next-auth/react";
+import { useState, useEffect } from "react";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
+import dynamic from "next/dynamic";
+import { ThemeProvider } from "@/components/ClientThemeProvider";
 
+// ✅ بارگذاری داینامیک NextThemesProvider بدون SSR
+const NextThemesProvider = dynamic(
+  () => import("next-themes").then((mod) => mod.ThemeProvider),
+  { ssr: false },
+);
 export default function Providers({
   children,
   dehydratedState,
@@ -33,19 +41,22 @@ export default function Providers({
       }),
   );
 
+  // در کلاینت، کل Providerهای وابسته به window را رندر کن
   return (
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <QueryClientProvider client={queryClient}>
-          {dehydratedState ? (
-            <HydrationBoundary state={dehydratedState}>
-              {children}
-            </HydrationBoundary>
-          ) : (
-            children
-          )}
-        </QueryClientProvider>
-      </PersistGate>
-    </Provider>
+    <SessionProvider>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <QueryClientProvider client={queryClient}>
+            {dehydratedState ? (
+              <HydrationBoundary state={dehydratedState}>
+                <ThemeProvider>{children}</ThemeProvider>
+              </HydrationBoundary>
+            ) : (
+              <ThemeProvider>{children}</ThemeProvider>
+            )}
+          </QueryClientProvider>
+        </PersistGate>
+      </Provider>
+    </SessionProvider>
   );
 }

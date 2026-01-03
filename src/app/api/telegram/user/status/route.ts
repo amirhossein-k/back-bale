@@ -12,7 +12,9 @@ export async function POST(request: any) {
 
     if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 });
     // 1️⃣ اول یوزر را با Telegram ID پیدا کن
-    const user = await User.findOne({ telegramId: Number(userId) }).lean();
+    const telegramId = Number(userId);
+
+    const user = await User.findOne({ telegramId }).lean();
 
     if (!user) {
       // کاربر در دیتابیس ثبت‌نام نکرده است
@@ -21,6 +23,8 @@ export async function POST(request: any) {
         buildings: [],
       });
     }
+
+    const allBilding = await Building.find().select('_id managerId chatIdGroup').lean();
 
     const mongoUserId = user._id; // MongoDB ObjectId واقعی
 
@@ -58,6 +62,13 @@ export async function POST(request: any) {
         role: "user",
         mongoUserId,
         buildings: memberBuildings
+      });
+    } else if (user.role === 'modir') {
+      return NextResponse.json({
+        role: "modir",
+        mongoUserId,
+        buildings: [],
+        bilding: allBilding
       });
     }
     // اگر نه عضو ساختمانی بود و نه پلنی خریده بود

@@ -1,4 +1,6 @@
-// src\app\api\telegram\building\[buildingId]\available-groups\route.ts
+
+
+// // src\app\api\telegram\building\[buildingId]\available-groups\route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import { dbConnect } from '@/app/api/mongodb';
@@ -43,7 +45,7 @@ export async function GET(
         const botGroups = await BotGroup.find({ adminId: user._id }).select('chatId title type');
         // const availableGroups: any[] = [];
         // availableGroups.push(botGroups)
-        // 
+        //
 
         return NextResponse.json({ groups: botGroups });
     } catch (error: any) {
@@ -51,3 +53,4 @@ export async function GET(
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+

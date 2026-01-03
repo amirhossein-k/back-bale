@@ -1,46 +1,53 @@
-// src\lib\queryConfig\telegram\createQueryConfig.ts
-import { useQuery, UseQueryResult, UseQueryOptions, QueryKey } from '@tanstack/react-query';
-import { getStatusUser } from './Req';
+// src/lib/queryConfig/telegram/createQueryConfig.ts
+import { UseQueryOptions } from '@tanstack/react-query';
+import { getStatusUser, getUser } from './Req';
+import type { StatusResponse } from './Req';
 
-import type { StatusResponse } from './Req'; // تایپ خروجی getStatusUser
+// نوع کوئری‌های پشتیبانی شده
+export type UserStatusQueryKey = 'userFetch' | 'userModelFetch';
 
-// ─── تنظیمات ورودی ──────────────────────────────
+// نوع پارامترهای ورودی
 interface QueryConfigOptions {
-    userId?: number; // ← string باشد، چون getStatusUser string می‌گیرد
+    userId?: number;
 }
-// ─── نوع QueryKey (برای caching) ─────────────────
-type UserStatusQueryKey = ["userFetch"];
 
-// ─── تابع تولید config برای React Query ──────────
-// تابعی که تنظیمات useQuery را بر اساس نوع ورودی برمی‌گرداند
-export const getQueryConfigUser = ({
-    queryType,
-    options,
-}: {
-    queryType: 'userFetch'; // انواع کوئری‌های ممکن
+export type UserModelResponse = Awaited<ReturnType<typeof getUser>>
 
-    options: QueryConfigOptions;
-}): UseQueryOptions<StatusResponse, Error, StatusResponse, UserStatusQueryKey> => {
 
-    const { userId } = options;
 
-    switch (queryType) {
-        case 'userFetch':
-            return {
-                queryKey: ["userFetch"], //closeId = type Modal Open => BLOG | PRODUCT
-                queryFn: () => getStatusUser(userId!),
-                enabled: !!userId,                     // ← فقط وقتی userId هست اجرا شود
-                staleTime: 1000 * 60 * 5,
-            };
 
-        // case 'other':
-        //   return {
-        //     queryKey: ["some-other-key", supplierId, currentPage],
-        //     queryFn: () => getSomeOtherData(supplierId, currentPage),
-        //     enabled: !!supplierId,
-        //     staleTime: 1000 * 60 * 5,
-        //   };
-        default:
-            throw new Error(`Unknown query type: ${queryType}`);
-    }
-};
+// تابع تولید config
+export const getQueryConfigUser =
+    <TQueryFnData = StatusResponse | UserModelResponse,
+        TError = Error,
+        TData = TQueryFnData>({
+            queryType,
+            options,
+        }: {
+            queryType: UserStatusQueryKey;
+            options: QueryConfigOptions;
+        }): UseQueryOptions<TQueryFnData, TError, TData, [UserStatusQueryKey, number?]> => {
+        const { userId } = options;
+
+        // اعتبارسنجی userId برای کوئری‌هایی که نیاز دارند
+        const isUserIdValid = userId !== undefined;
+
+        switch (queryType) {
+            case 'userFetch':
+                return {
+                    queryKey: ['userFetch', userId],   // شامل userId برای کش مجزا
+                    queryFn: () => getStatusUser(userId!) as Promise<TQueryFnData>,
+                    enabled: isUserIdValid,
+                    staleTime: 1000 * 60 * 5,
+                } as UseQueryOptions<TQueryFnData, TError, TData, [UserStatusQueryKey, number?]>;
+            case 'userModelFetch':
+                return {
+                    queryKey: ['userModelFetch', userId],
+                    queryFn: () => getUser(userId!) as Promise<TQueryFnData>,
+                    enabled: isUserIdValid,
+                    staleTime: 1000 * 60 * 5,
+                } as UseQueryOptions<TQueryFnData, TError, TData, [UserStatusQueryKey, number?]>;
+            default:
+                throw new Error(`Unknown query type: ${queryType}`);
+        }
+    };

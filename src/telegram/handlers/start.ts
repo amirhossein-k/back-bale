@@ -62,8 +62,27 @@ export function startHandler() {
                         $addToSet: { members: user._id },
                     });
 
+
+
+
                     user.role = 'user'
                     user.save()
+                    // ✅ ارسال پیام به گروه ساختمان
+
+                    if (building.chatIdGroup) {
+                        try {
+                            await ctx.telegram.sendMessage(
+                                Number(building.chatIdGroup),
+                                `🎉 کاربر جدید: ${user.firstName || ''} ${user.lastName || ''} به ساختمان "${building.name}" اضافه شد.`
+                            )
+
+
+                        } catch (groupError) {
+                            console.error('❌ خطا در ارسال پیام به گروه:', groupError);
+                            // اینجا می‌تونی به ادمین اطلاع بدی
+
+                        }
+                    }
                     await ctx.reply(
                         `🎉 شما با موفقیت به ساختمان "${building.name}" اضافه شدید!`,
                         {
@@ -71,7 +90,7 @@ export function startHandler() {
                                 inline_keyboard: [
                                     [{
                                         text: '🏢 مشاهده ساختمان',
-                                        web_app: { url: `https://dev.marloo.shop/dashboard` }
+                                        web_app: { url: `https://marloo.shop` }
                                     }],
                                 ],
                             },
@@ -86,7 +105,7 @@ export function startHandler() {
             if (payload && payload.startsWith('POR_')) {
                 console.log(payload, 'payloadd')
                 // کاربر دعوت شده
-                const referrer = await User.findOne({ referralCode: `https://ble.ir/Helppaymentbot?start=${payload}` });
+                const referrer = await User.findOne({ referralCode: `https://ble.ir/hamyarmarloobot?start=${payload}` });
                 if (!referrer) {
                     await ctx.reply(
                         `خطا`
@@ -104,25 +123,54 @@ export function startHandler() {
 
             // ─── کاربر قبلی – بررسی botState ────────────────
             if (user.botState === 'awaiting_building_name') {
+                const messageId = (ctx.update.update_id) - 1;
+                ctx.deleteMessage(Number(messageId))
                 await ctx.reply(
-                    '📝 لطفاً **نام ساختمان** خود را وارد کنید:\n' +
-                    '(برای لغو دستور /cancel را بزنید)',
-                    { parse_mode: 'Markdown' }
+                    '📝 لطفاً **نام ساختمان** خود را وارد کنید:\n',
+
+                    // {
+                    //     reply_markup: {
+                    //         inline_keyboard: [
+                    //             [{ text: 'برگشت', callback_data: '/backUser_NameBuild', }],
+
+                    //         ],
+
+                    //     },
+                    //     parse_mode: 'Markdown'
+                    // }
                 );
                 return;
             }
 
             if (user.botState === 'awaiting_building_address') {
+                // const messageId = (ctx.update.update_id) - 1;
+                // ctx.deleteMessage(Number(messageId))
                 await ctx.reply(
-                    `📝 لطفاً **آدرس ساختمان** (${user.tempBuildingName || ''}) را وارد کنید:\n` +
-                    '(برای لغو دستور /cancel را بزنید)',
+                    `📝 لطفاً **آدرس ساختمان** (${user.tempBuildingName || ''}) را وارد کنید:\n`,
+                    {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: 'برگشت', callback_data: 'backUser_NameBuild', }],
+
+                            ],
+
+                        }, parse_mode: 'Markdown'
+                    }
+                );
+                return;
+            }
+            if (user.botState === 'awaiting_card') {
+                // const messageId = (ctx.update.update_id) - 1;
+                // ctx.deleteMessage(Number(messageId))
+                await ctx.reply(
+                    `📝 لطفاً **شماره کارت ** (${user.tempBuildingName || ''}) را وارد کنید:\n`,
                     { parse_mode: 'Markdown' }
                 );
                 return;
             }
 
             // botState === 'idle' → منوی اصلی
-            const isAdmin = user.role === 'admin';
+            const isAdmin = user.role === 'admin' || user.role === 'modir';
             const isUser = user.role === 'user';
             // await ctx.reply(
             //     (isAdmin || isUser)
@@ -157,7 +205,7 @@ export function startHandler() {
                             [
                                 Markup.button.webApp(
                                     '🚀 باز کردن مینی‌اپ',
-                                    'https://dev.marloo.shop/dashboard'
+                                    'https://marloo.shop'
                                 ),
                             ],
                             [
@@ -174,8 +222,10 @@ export function startHandler() {
                             ],
                         ] : [
                             [
-                                Markup.button.callback('💰 خرید پلن مدیریت', "buy_plane"),
-                                Markup.button.callback('کسب درآمد', 'kasb'),
+                                Markup.button.webApp(
+                                    '💰 خرید پلن مدیریت',
+                                    'https://marloo.shop'
+                                ), Markup.button.callback('کسب درآمد', 'kasb'),
                             ],
                         ]
 

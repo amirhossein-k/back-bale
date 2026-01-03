@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'کاربر یافت نشد' }, { status: 404 });
         }
 
-        console.log(`\api\telegram\building\getInviteLink == user ${user}`)
+        // console.log(`/api\telegram\building\getInviteLink == user ${user}`)
         const building = await Building.findById(buildingId);
         if (!building) {
             return NextResponse.json({ error: 'ساختمان یافت نشد' }, { status: 404 });
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
 
         const botUsername = process.env.BOT_USERNAME; // مثلاً: mybuildingbot
-        const inviteLink = `https://ble.ir/Helppaymentbot?start=${building.inviteCode}`;
+        const inviteLink = `https://ble.ir/hamyarmarloobot?start=${building.inviteCode}`;
 
         return NextResponse.json({ inviteLink, inviteCode: building.inviteCode });
 

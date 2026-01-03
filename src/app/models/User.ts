@@ -29,11 +29,12 @@ export interface IUser extends Document {
   firstName?: string;
   lastName?: string;
   username?: string;
-  role: 'none' | 'user' | 'admin';
+  role: 'none' | 'user' | 'admin' | 'modir';
   botState: 'idle' | 'awaiting_building_name' | 'awaiting_building_address' | 'awaiting_card';
   tempBuildingName?: string;
   tempBuildingId?: string;
-  referralCode: string | null;            // ← امکان null
+  referralCode: string | null;
+  phoneNumber: string | null           // ← امکان null
   referredBy: mongoose.Types.ObjectId | null;
   totalCommission: number;
   pendingCommission: number;
@@ -41,7 +42,10 @@ export interface IUser extends Document {
   updatedAt: Date;
   cardNumber?: string;       // شماره کارت
   sheba?: string;            // شماره شبا (اختیاری)
-  fullName?: string;         // نام صاحب حساب
+  fullName?: string;
+  adressBuilding?: string
+  nameBuilding?: string
+  tempBuildingAddress?: string       // نام صاحب حساب
 }
 
 // referralCode: کد منحصربه‌فرد برای هر کاربر (مثلاً "u7f3a9").
@@ -55,11 +59,11 @@ const UserSchema = new Schema<IUser>(
 
     telegramId: { type: Number, required: true, unique: true },
     firstName: { type: String },
-    lastName: { type: String },
+    lastName: { type: String },// اسم متسعاری که مدیر میزارد
     username: { type: String },
     role: {
       type: String,
-      enum: ['none', 'user', 'admin'],
+      enum: ['none', 'user', 'admin', 'modir'],
       default: 'none',
     },
     botState: {
@@ -69,9 +73,11 @@ const UserSchema = new Schema<IUser>(
     },
     tempBuildingName: { type: String, default: undefined },
     tempBuildingId: { type: String, default: undefined },
-
+    tempBuildingAddress: { type: String, default: undefined },
+    adressBuilding: { type: String, default: undefined },
+    nameBuilding: { type: String, default: undefined },
     // ─── فیلدهای ارجاع ───
-    referralCode: {
+    referralCode: { //کد دعوت
       type: String,
       unique: true,
       sparse: true,
@@ -92,6 +98,10 @@ const UserSchema = new Schema<IUser>(
     cardNumber: { type: String },
     sheba: { type: String },
     fullName: { type: String },
+    phoneNumber: {
+      type: String, default: '', unique: true,
+      sparse: true
+    }
   },
   { timestamps: true }
 );
@@ -100,7 +110,7 @@ const UserSchema = new Schema<IUser>(
 UserSchema.pre('save', async function () {
   if (this.isNew && !this.referralCode) {
     const code = await getUniqueReferralCode();
-    this.referralCode = `https://ble.ir/Helppaymentbot?start=POR_${code}_${this._id}`
+    this.referralCode = `https://ble.ir/hamyarmarloobot?start=POR_${code}_${this._id}`
   }
 });
 
