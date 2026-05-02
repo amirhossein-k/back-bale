@@ -1,0 +1,75 @@
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL") // این خط متغیر محیطی را می‌خواند
+}
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+model OTP {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    phone     String
+    codeHash  String
+    createdAt DateTime @default(now())
+    expiresAt DateTime
+}
+
+model User {
+    id          String           @id @default(auto()) @map("_id") @db.ObjectId
+    telegramId  Float            @unique
+    firstName   String?
+    lastName    String?
+    username    String?
+    // مدیر یا عضو بودن از طریق relations مشخص می‌شود
+    buildings   Building[]       @relation("Manager") // ساختمان‌هایی که مدیر است
+    memberships BuildingMember[] // عضویت در ساختمان‌ها
+    purchases   Purchase[] // خریدهای پلن
+    createdAt   DateTime         @default(now())
+    updatedAt   DateTime         @updatedAt
+}
+
+model Building {
+    id            String           @id @default(auto()) @map("_id") @db.ObjectId
+    name          String // نام ساختمان
+    address       String?
+    managerId     String           @db.ObjectId // مدیر ساختمان
+    manager       User             @relation("Manager", fields: [managerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    members       BuildingMember[]
+    announcements Announcement[]
+    createdAt     DateTime         @default(now())
+    updatedAt     DateTime         @updatedAt
+}
+
+model BuildingMember {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId     String   @db.ObjectId
+    user       User     @relation(fields: [userId], references: [id])
+    buildingId String   @db.ObjectId
+    building   Building @relation(fields: [buildingId], references: [id])
+    createdAt  DateTime @default(now())
+
+    // role? (ساکن، نگهبان، etc.)
+    @@unique([userId, buildingId])
+}
+
+model Announcement {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    buildingId String   @db.ObjectId
+    building   Building @relation(fields: [buildingId], references: [id])
+    title      String
+    content    String
+    createdAt  DateTime @default(now())
+}
+
+model Purchase {
+    id       String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId   String   @db.ObjectId
+    user     User     @relation(fields: [userId], references: [id])
+    plan     String // "management" or other
+    amount   Float
+    paidAt   DateTime @default(now())
+    orderId  String? // شناسه سفارش از درگاه
+    verified Boolean  @default(false)
+    // orderId از درگاه پرداخت
+}
