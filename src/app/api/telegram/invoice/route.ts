@@ -8,7 +8,6 @@ const API_URL2 = `https://tapi.bale.ai/bot1141850488:chb9KioVVst6Z_LuWLRKW_aZ2Ra
 const TOKEN = "WALLET-LZMGcUwl4yNP2IUc";
 export async function POST(
     request: NextRequest,
-    { params }: { params: Promise<{ buildingId: string; }> }
 ) {
     try {
 
