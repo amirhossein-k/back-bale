@@ -49,7 +49,7 @@ const UserCharge = ({
           <div key={month} className="border rounded-lg p-4">
             <div className="flex justify-between items-center">
               <div>
-                <span className="font-bold">{monthNames[month]}</span>
+                {/* <span className="font-bold">{monthNames[month]}</span> */}
                 <span className="text-gray-500 mr-2">۱۴۰۴</span>
               </div>
               <span
