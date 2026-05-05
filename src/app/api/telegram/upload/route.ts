@@ -1,0 +1,98 @@
+// app/api/upload/route.ts
+import { NextResponse } from 'next/server';
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client } from '@/app/lib/s3';
+// import s3Client from '@/app/lib/s3';
+
+
+
+export async function POST(req: Request) {
+  try {
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+
+    // اعتبارسنجی فایل
+    if (!file || file.size === 0) {
+      return NextResponse.json(
+        { error: 'لطفا یک فایل تصویر انتخاب کنید' },
+        { status: 400 }
+      );
+    }
+
+
+
+    // تبدیل File به Buffer
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const key = `uploads/qhab/${Date.now()}-${file.name}`;
+    // پارامترهای آپلود
+    const params = {
+      Bucket: process.env.LIARA_BUCKET_NAME ?? 'c589564',
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+    };
+
+    // آپلود به پارس‌پک
+    const up = await s3Client.send(new PutObjectCommand(params));
+    console.log(up, 'up')
+    // let typefile = ''
+    // const searchChar = params.ContentType.search('/')
+
+    // typefile = params.ContentType.slice(searchChar +1)
+
+
+
+
+    // تولید لینک عمومی
+    const publicUrl = `${process.env.LIARA_ENDPOINT!}/${process.env.LIARA_BUCKET_NAME!}/${params.Key}`
+
+    return NextResponse.json({
+      success: true,
+      url: publicUrl,
+      Key: key
+    });
+
+  } catch (error) {
+    console.error('خطا در آپلود:', error);
+    return NextResponse.json(
+      { error: 'خطا در آپلود فایل' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { key } = await req.json();
+    console.log('کلید برای حذف:', key);
+
+    // اعتبارسنجی کلید
+    if (!key || typeof key !== 'string') {
+      return NextResponse.json(
+        { error: 'کلید فایل نامعتبر است' },
+        { status: 400 }
+      );
+    }
+
+    // پارامترهای حذف
+    const params = {
+      Bucket: process.env.LIARA_BUCKET_NAME ?? 'c589564',
+      Key: key,
+    };
+
+    console.log(params, 'prarsms')
+    // حذف فایل از پارس‌پک
+    await s3Client.send(new DeleteObjectCommand(params));
+
+    return NextResponse.json({
+      success: true,
+      message: `فایل با کلید ${key} با موفقیت حذف شد`,
+    });
+  } catch (error) {
+    console.error('خطا در حذف فایل:', error);
+    return NextResponse.json(
+      { error: 'خطا در حذف فایل' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,9 +1,13 @@
 // src/app/api/telegram/validateminiapp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import User from '@/app/models/User';
+import { dbConnect } from '../../mongodb';
 
 export async function POST(request: NextRequest) {
     try {
+        await dbConnect();
+
         const body = await request.json();
         const initData = body.initData as string;
 
@@ -31,8 +35,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: 'Invalid data' }, { status: 403 });
         }
 
-        const user = JSON.parse(params.get('user') || '{}');
-        return NextResponse.json({ ok: true, user });
+        const userStr = JSON.parse(params.get('user') || '{}');
+        return NextResponse.json({ ok: true, userStr });
+
+
     } catch (error) {
         console.error('Validation error:', error);
         return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
