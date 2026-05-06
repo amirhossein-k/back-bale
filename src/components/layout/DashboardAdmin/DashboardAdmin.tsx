@@ -7,29 +7,29 @@ import InviteLinkManager from "@/components/InviteLinkManager";
 import MemberForAdmin from "@/components/BaleUI/memebersForAdmin/MemberForAdmin";
 import SendToGroupForm from "@/components/BaleUI/SendToGroupForm/SendToGroupForm";
 import FloatingHelpButton from "@/components/ui/FloatingHelpButton";
-import { useBaleWebApp } from "@/hooks/useBaleWebApp";
+import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
+import RegisterDropdown from "@/components/BaleUI/ChargeManager/RegisterDropdown";
 
-interface Props {
-  buildingId: any;
-  userId: any;
-}
+// interface Props {
+//   buildingId: any;
+//   userId: any;
+// }
 
-type URLSearch = {
-  sort?: string;
-  page?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  count?: string;
-  offer?: string;
-};
+const TOKEN = "WALLET-LZMGcUwl4yNP2IUc";
+const TOKEN2 = "WALLET-TEST-1111111111111111";
 
-export default function DashboardAdmin({ buildingId, userId }: Props) {
+export default function DashboardAdmin() {
+  const { buildingId, userId } = useSelector(
+    (state: RootState) => state.dataBale,
+  );
+
   const [openLink, setOpenLink] = useState(false);
   const [openListUser, setOpenListUser] = useState(false);
   const [openGapMessage, setOpenGapMessage] = useState(false);
 
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-
   const handleToggleLink = useCallback((state: boolean) => {
     setOpenLink(state);
   }, []);
@@ -41,13 +41,76 @@ export default function DashboardAdmin({ buildingId, userId }: Props) {
   }, []);
   console.log(window.Bale, "ffffff");
 
-  const API_URL = `https://tapi.bale.ai/bot1141850488:chb9KioVVst6Z_LuWLRKW_aZ2RaiPyjEYJ4/sendInvoice`;
-  const TOKEN = "WALLET-LZMGcUwl4yNP2IUc";
   const handleSend = async () => {
+    const toastId = toast.loading("در حال انجام  ...");
+
     try {
       const res = await fetch("/api/telegram/invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ TOKEN }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(`error: ${data.error}`, { id: toastId });
+        console.error("Failed to create invoice:", data.error);
+        return;
+      }
+      toast.success("اقدام به پرداخت کنید", { id: toastId });
+      const toastId2 = toast.loading("در حال انجام  ...");
+
+      // 2️⃣ باز کردن صفحه پرداخت با openInvoice (SDK)
+      window.Bale?.WebApp?.openInvoice(data.invoiceLink, (status: any) => {
+        console.log("object", status);
+        setPaymentStatus(status);
+        // toast.success(``, { id: toastId });
+
+        // toast.success(`status: ${typeof status} - ${status.invoiceClosed}`);
+        // status می‌تواند: "paid" | "cancelled" | "failed" | "pending"
+        switch (status.status) {
+          case "paid":
+            toast.success("✅ پرداخت با موفقیت انجام شد!", { id: toastId2 });
+          case "cancelled":
+            toast.error(`صفحه پرداخت بسته شد`, { id: toastId2 });
+          case "failed":
+            toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+              id: toastId2,
+            });
+          case "pending":
+            if (status.status === "failed") {
+              toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+                id: toastId2,
+              });
+            } else if (status.status === "cancelled") {
+              toast.error(`صفحه پرداخت بسته شد`, { id: toastId2 });
+            } else if (status.status === "failed") {
+              toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+                id: toastId2,
+              });
+            } else {
+              toast.success("✅ پرداخت با موفقیت انجام شد!", { id: toastId2 });
+            }
+        }
+      });
+      // if (window.Bale?.WebApp?.onEvent()) {
+      //   toast.error("exit");
+      // }
+    } catch (error: any) {
+      console.log(error, "errorr");
+      toast.error(`خطا در پرداخت : ${error.message || "خطای نامشخص"}`, {
+        id: toastId,
+      });
+    }
+  };
+  const handleSendTest = async () => {
+    const toastId = toast.loading("در حال انجام  ...");
+
+    try {
+      const res = await fetch("/api/telegram/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ TOKEN: TOKEN2 }),
       });
 
       const data = await res.json();
@@ -55,33 +118,51 @@ export default function DashboardAdmin({ buildingId, userId }: Props) {
         console.error("Failed to create invoice:", data.error);
         return;
       }
+      toast.success("اقدام به پرداخت کنید", { id: toastId });
+      const toastId2 = toast.loading("در حال انجام  ...");
 
       // 2️⃣ باز کردن صفحه پرداخت با openInvoice (SDK)
-      window.Bale?.WebApp?.openInvoice(data.invoiceLink, (status: string) => {
-        console.log("object");
+      window.Bale?.WebApp?.openInvoice(data.invoiceLink, (status: any) => {
+        console.log("object", status);
         setPaymentStatus(status);
-        // status می‌تواند: "paid" | "cancelled" | "failed" | "pending"
-        if (status === "paid") {
-          // پرداخت موفق - اقدامات بعدی
-          console.log("✅ پرداخت با موفقیت انجام شد!");
-        } else if (status === "cancelled") {
-          console.log("❌ کاربر پرداخت را لغو کرد");
-        }
-      });
+        // toast.success(``, { id: toastId });
 
-      // openInvoice({ invoiceParams: data.invoiceLink }, (status: string) => {
-      //   console.log("object");
-      //   setPaymentStatus(status);
-      //   // status می‌تواند: "paid" | "cancelled" | "failed" | "pending"
-      //   if (status === "paid") {
-      //     // پرداخت موفق - اقدامات بعدی
-      //     console.log("✅ پرداخت با موفقیت انجام شد!");
-      //   } else if (status === "cancelled") {
-      //     console.log("❌ کاربر پرداخت را لغو کرد");
-      //   }
-      // });
-    } catch (error) {
+        // toast.success(`status: ${typeof status} - ${status.invoiceClosed}`);
+        // status می‌تواند: "paid" | "cancelled" | "failed" | "pending"
+        switch (status.status) {
+          case "paid":
+            toast.success("✅ پرداخت با موفقیت انجام شد!", { id: toastId2 });
+          case "cancelled":
+            toast.error(`صفحه پرداخت بسته شد`, { id: toastId2 });
+          case "failed":
+            toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+              id: toastId2,
+            });
+          case "pending":
+            if (status.status === "failed") {
+              toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+                id: toastId2,
+              });
+            } else if (status.status === "cancelled") {
+              toast.error(`صفحه پرداخت بسته شد`, { id: toastId2 });
+            } else if (status.status === "failed") {
+              toast.error(`❌دوباره تلاش کنید پرداخت صورت نگرفت`, {
+                id: toastId2,
+              });
+            } else {
+              toast.success("✅ پرداخت با موفقیت انجام شد!", { id: toastId2 });
+            }
+        }
+        // console.log(window.Bale?.WebApp?.onEvent(),'event')
+      });
+      // if (window.Bale?.WebApp?.invoiceClosed) {
+      //   toast.error("exit");
+      // }
+    } catch (error: any) {
       console.log(error, "errorr");
+      toast.error(`خطا در پرداخت : ${error.message || "خطای نامشخص"}`, {
+        id: toastId,
+      });
     }
   };
   return (
@@ -139,6 +220,7 @@ export default function DashboardAdmin({ buildingId, userId }: Props) {
           exit={{ opacity: 0 }}
           className="rounded-2xl gap-1.5 flex flex-col bg-white p-5 shadow-sm ring-1 ring-gray-100 bg-linear-to-l from-indigo-600 to-purple-600 px-5 py-4 text-white "
         >
+          <RegisterDropdown />
           {/* ── دکمه لیست کاربران  ──────────────────────────── */}
 
           <motion.button
@@ -159,6 +241,9 @@ export default function DashboardAdmin({ buildingId, userId }: Props) {
           </motion.button>
           <button className="p-3" onClick={handleSend}>
             پرداخت
+          </button>
+          <button className="p-3 bg-amber-200" onClick={handleSendTest}>
+            test پرداخت
           </button>
           {/* ── دکمه پیام در گروه   ──────────────────────────── */}
 

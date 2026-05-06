@@ -60,11 +60,7 @@ function reducer(state: BaleAppState & { isSDKInitialized: boolean }, action: Ac
                 isValidated: true,
                 validationError: null,
                 isSDKInitialized: true,
-                openInvoice: (link, callback) => {
-                    console.log("📌 [DEV] openInvoice called with:", link, callback);
-                    // در محیط توسعه، شبیه‌سازی موفقیت
-                    callback?.("paid");
-                },
+
 
             };
         case "SET_SDK_INITIALIZED":
@@ -80,6 +76,7 @@ function reducer(state: BaleAppState & { isSDKInitialized: boolean }, action: Ac
 function applySDKSettings(webApp: BaleWebApp) {
     // فقط ready() را فراخوانی کن، expand() را به بعد موکول کن
     webApp.ready?.();
+    webApp.expand?.();
 
     // تنظیم رنگ هدر
     webApp.setHeaderColor?.(BALE_CONSTANTS.HEADER_COLOR);
@@ -145,6 +142,7 @@ export function useBaleWebApp() {
             // 3. اعتبارسنجی
             handleValidation(webApp);
             // ثبت event listenerهای موجود در نقشه
+            // ثبت event listenerهای موجود در نقشه
             eventListeners.current.forEach((handlers, eventType) => {
                 handlers.forEach((handler) => {
                     webApp.onEvent?.(eventType, handler);
@@ -180,45 +178,6 @@ export function useBaleWebApp() {
             return false;
         }
     }, []);
-
-    // ========== 1️⃣ openInvoice ==========
-    const openInvoice = useCallback(
-        (
-            invoiceParams: WebAppOpenInvoiceParams,
-            callback?: (status: string) => void
-        ) => {
-            const webApp = baleWebAppRef.current;
-            if (!webApp?.openInvoice) {
-                console.warn(
-                    "Bale WebApp not ready or openInvoice method not available."
-                );
-                callback?.("failed");
-                return;
-            }
-
-            webApp.openInvoice(invoiceParams, (status: string) => {
-                console.log("📄 Invoice status:", status);
-                callback?.(status);
-            });
-        },
-        []
-    );
-    // ========== 2️⃣ openLink ==========
-    const openLink = useCallback(
-        (url: string, options?: WebAppOpenLinkOptions) => {
-            const webApp = baleWebAppRef.current;
-            if (webApp?.openLink) {
-                webApp.openLink(url, options);
-            } else {
-                console.warn(
-                    "Bale WebApp not ready or openLink method not available."
-                );
-                // Fallback: باز کردن در پنجره جدید مرورگر
-                window.open(url, options?.try_instant_view ? "_blank" : "_self");
-            }
-        },
-        []
-    );
     // ========== 3️⃣ onEvent ==========
     const onEvent = useCallback(
         (eventType: WebAppEvent, eventHandler: EventHandler) => {
@@ -259,28 +218,6 @@ export function useBaleWebApp() {
         },
         []
     );
-    // ========== 5️⃣ close ==========
-    const close = useCallback(() => {
-        console.log("baleWebAppRef.current:", baleWebAppRef.current);
-        console.log("window.Bale.WebApp:", window.Bale?.WebApp);
-        console.log(window.Bale?.receiveEvent, 'object')
-        // const webApp = baleWebAppRef.current;
-        if (window.Bale?.WebApp?.close) {
-            console.log('not current')
-            window.Bale.WebApp.close();
-            return
-        }
-        // fallback به ref (اگر به هر دلیلی window در دسترس نبود)
-        const webApp = baleWebAppRef.current;
-        if (webApp?.close) {
-            console.log(' current')
-
-            webApp.close();
-            return;
-        }
-
-        console.warn("⚠️ close method not available in both window and ref");
-    }, []);
     // ========== 6️⃣ sendData ==========
     const sendData = useCallback((data: any) => {
         const webApp = baleWebAppRef.current;
@@ -372,16 +309,7 @@ export function useBaleWebApp() {
             isMounted = false;
             cleanup();
 
-            // پاکسازی event listenerها هنگام unmount
-            const webApp = baleWebAppRef.current;
-            if (webApp) {
-                eventListeners.current.forEach((handlers, eventType) => {
-                    handlers.forEach((handler) => {
-                        webApp.offEvent?.(eventType, handler);
-                    });
-                });
-                eventListeners.current.clear();
-            }
+
 
         };
     }, [initSDK]);
@@ -390,11 +318,7 @@ export function useBaleWebApp() {
     return {
         ...state,
         expandMiniApp, // اضافه کردن تابع expand به خروجی
-        openInvoice,
-        openLink,
-        onEvent,
-        offEvent,
-        close,
+
         sendData,
     };
 }

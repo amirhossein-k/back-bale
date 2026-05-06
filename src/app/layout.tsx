@@ -3,6 +3,7 @@
 import Script from "next/script";
 import "./globals.css";
 import Providers from "./Providers";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({
   children,
@@ -33,6 +34,8 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body suppressHydrationWarning>
+        <Toaster position="top-center" />
+
         <Providers>{children}</Providers>
       </body>
     </html>

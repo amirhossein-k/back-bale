@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 
 interface Props {
   buildingId: string;
-  userId: string;
+  userId: number;
   onClose: () => void;
 }
 

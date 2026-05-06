@@ -2,16 +2,14 @@
 "use client";
 
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import {
-  BaleReceiveEvent,
-  BaleUser,
-  WebAppOpenInvoiceParams,
-} from "@/types/bale";
+import { BaleUser, WebAppOpenInvoiceParams } from "@/types/bale";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryConfigUser } from "@/lib/queryConfig/telegram/createQueryConfig";
 import DashboardAdmin from "../layout/DashboardAdmin/DashboardAdmin";
 import DashboardUser from "../layout/DashboardUser/DashboardUser";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { DateBaleSetAction } from "@/store/Slice/BaleDateSlice";
 
 // ─── Variants (✅ corrected) ──────────────────────────────────────────────
 const containerVariants: Variants = {
@@ -97,22 +95,12 @@ function ErrorCard({ message }: { message: string }) {
 interface Props {
   user: BaleUser;
   isIframe: boolean;
-  openInvoice: (
-    params: WebAppOpenInvoiceParams,
-    callback?: (status: string) => void,
-  ) => void;
-  closes: any;
 }
 
-export default function ValidatedContent({ user, isIframe, closes }: Props) {
+export default function ValidatedContent({ user, isIframe }: Props) {
   const [isBaleReady, setIsBaleReady] = useState(false);
 
-  const handleClose = useCallback(() => {
-    console.log("🔍 close function:", closes);
-    console.log("🔍 typeof close:", typeof closes);
-    console.log("🔍 window.Bale?.WebApp?.close:", window.Bale?.WebApp?.close);
-    closes(); // اگر close undefined باشد این جا خطا می‌دهد
-  }, []);
+  const dispatch = useDispatch();
 
   const { data, isLoading, error } = useQuery(
     getQueryConfigUser({
@@ -120,7 +108,14 @@ export default function ValidatedContent({ user, isIframe, closes }: Props) {
       options: { userId: user.id },
     }),
   );
-
+  //  buildingId={data.buildings[0]?.id}
+  // userId={user.id}
+  if (data?.mongoUserId) {
+    // redux
+    dispatch(
+      DateBaleSetAction({ buildingId: data.buildings[0].id, userId: user.id }),
+    );
+  }
   // چک کردن آمادگی Bale SDK
   useEffect(() => {
     // اگر SDK از قبل آماده است
@@ -188,15 +183,6 @@ export default function ValidatedContent({ user, isIframe, closes }: Props) {
       animate="visible"
       className="min-h-screen bg-gradient-to-b from-white via-indigo-50/20 to-white px-4 pb-8 pt-4"
     >
-      <button onClick={handleClose}>پرداخت</button>{" "}
-      <button
-        className="mx-2"
-        onClick={() => {
-          console.log("wwww", window.Bale?.receiveEvent);
-        }}
-      >
-        ddddddd
-      </button>{" "}
       <AnimatePresence>
         {isIframe && (
           <motion.div
@@ -303,10 +289,7 @@ export default function ValidatedContent({ user, isIframe, closes }: Props) {
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 180, damping: 20 }}
             >
-              <DashboardAdmin
-                buildingId={data.buildings[0]?.id}
-                userId={user.id}
-              />
+              <DashboardAdmin />
             </motion.div>
           ) : data?.role === "user" ? (
             <motion.div

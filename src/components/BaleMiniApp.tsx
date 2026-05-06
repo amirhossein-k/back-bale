@@ -8,15 +8,8 @@ import ValidatingState from "@/components/BaleUI/ValidatingState";
 import ValidatedContent from "@/components/BaleUI/ValidatedContent";
 
 export default function BaleMiniApp() {
-  const {
-    isSDKReady,
-    userInfo,
-    isValidated,
-    validationError,
-    isIframe,
-    openInvoice,
-    close,
-  } = useBaleWebApp();
+  const { isSDKReady, userInfo, isValidated, validationError, isIframe } =
+    useBaleWebApp();
 
   // ---------- Render ----------
   if (!isSDKReady) return <LoadingState />;
@@ -26,12 +19,5 @@ export default function BaleMiniApp() {
   if (!userInfo) return <p>No user data available</p>;
   console.log(close, "close");
 
-  return (
-    <ValidatedContent
-      user={userInfo}
-      isIframe={isIframe}
-      openInvoice={openInvoice}
-      closes={close}
-    />
-  );
+  return <ValidatedContent user={userInfo} isIframe={isIframe} />;
 }

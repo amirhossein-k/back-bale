@@ -19,8 +19,8 @@ interface Member {
 }
 
 interface Props {
-  buildingId: any;
-  currentUserId: string; // شناسه کاربر لاگین‌شده (برای بررسی دسترسی)
+  buildingId: string;
+  currentUserId: number; // شناسه کاربر لاگین‌شده (برای بررسی دسترسی)
 }
 
 export default function MemberForAdmin({ buildingId, currentUserId }: Props) {

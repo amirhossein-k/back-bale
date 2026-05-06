@@ -14,9 +14,11 @@ import { createWithdrawalRequest } from "@/hooks/createWithdrawalRequest";
 import WithdrawalRequest from "@/app/models/WithdrawalRequest";
 import BotGroup from "@/app/models/BotGroup";
 import { extractAmountFromCaption } from "@/lib/extract";
-import { saveReceiptToBale } from "@/lib/helper";
 import BuildingMember from "@/app/models/BuildingMember";
 import { sendTelegramNotification } from "@/lib/notifyAdmin";
+import { Wallet } from "@/app/models/Wallet";
+import { Transaction } from "@/app/models/Transaction";
+import MonthlyCharge from "@/app/models/MonthlyCharge";
 
 const activeChats = new Map<number, number>();
 const editState = new Map<number, "about" | "searching" | "interests" | "name" | "age">();
@@ -112,14 +114,86 @@ bot.action('buy_plane', BuyPlaneHandler())
 
 const messageHandler = async (ctx: Context) => {
     console.log(`ctx message == ${ctx}`, ctx)
-    //  const payload = (ctx as any).startPayload;
-    // const chatt = ctx.message.chat;
+
+    // --------- برای پرداخت نهایی شده --------------------
+    // -------------                        --------------------
+    if ((ctx.update as any)?.message?.successful_payment) {
+
+        const message = (ctx.update as any)?.message
+        if (!message?.successful_payment) return;
+        ///update =>>>> message =>> date : تاریخ 
+        const datePay = message?.date
+        //update =>>>> message =>>>>>  from :من که پرداخت کردم or  chat
+        const userInfoBuyId = message?.from?.id
+        //update =>>> successful_payment =>>>> total_amount | invoice_payload: example= order_360594256_1778018078695 | telegram_payment_charge_id : کد پیگیری
+        const payment = (ctx.update as any)?.successful_payment
+        const paymentInfo = {
+            amount: payment?.total_amount,
+            invoice_payload: payment?.invoice_payload,
+            paygiri: payment?.telegram_payment_charge_id
+        }
+        // save to database
+        // ------------- // مدیر ساختمان را از روی 
+        // -------------// buldingmember  پیدا کن
+        const telegramId = String(userInfoBuyId);
+        // 1-userID
+        // const { telegramId } = await User.findOne({ telegramId: userInfoBuyId }).select('telegramId')
+        // 2-memberbuildig
+        // const { buildingId } = await BuildingMember.findOne({ userId: UserIDFound }).select('buildingId')
+
+        //کیف پولش پیدا میکنیم
+        const { buildingId } = await Wallet.findOne({ userId: telegramId }).select('buildingId').lean()
+        //  مقدار را به کیف پول مدیر ساختمان واریز میکنیم اما چون  مدیر ربات هنوز پول پرداخت نکرده به مدیر پس وضعیت ان  را 
+        // pending یزاریم
+        if (!buildingId) {
+            throw new Error('کیف پول مقصد وجود ندارد');
+        }
+        // ۴. بروزرسانی موجودی‌ها
+
+        await Wallet.updateOne(
+            { userId: telegramId },
+            { $inc: { balance: paymentInfo.amount }, $set: { updatedAt: new Date() } }
+
+        );
+        // ۵. ثبت تراکنش
+        // نوع ان را باید توی =>> invoice_payload  ==> جا بدیم
+        // چون عنوان مختلف تایید پرداخت داریم
+        await Transaction.create({
+            userId: telegramId,
+            buildingId,
+            amount: paymentInfo.amount,
+            type: 'charge',
+            description: 'شارژ ماهیانه',
+            status: 'completed',
+            paymentMethod: 'bale_wallet',
+            referenceId: paymentInfo.paygiri,//کد پیگری
+            completedAt: datePay
+        })
+
+        await MonthlyCharge.updateOne(
+            { buildingId },
+            { $pull: { targetMember: telegramId } }
+        );
+
+        await ctx.reply(
+            `شارژ ماهیانه پرداخت شد\n
+                کد پیگیری: ${paymentInfo.paygiri}
+                زمان: ${datePay}
+                `,
+            { parse_mode: 'Markdown' }
+        );
+
+
+
+
+    }
+
+
+    // if(ctx.update)
 
     // user info
-    const updateId = (ctx.update as any)?.message?.from?.id
     // گروه ==> (ctx.update as any)?.message?.chat ==>id,type,title
     const updateGroup = (ctx.update as any)?.message?.chat
-    console.log(updateId, 'updateId')
     console.log(updateGroup, 'updateGroup')
     // read text send
     const updateText = (ctx.update as any)?.message?.text
@@ -129,6 +203,7 @@ const messageHandler = async (ctx: Context) => {
         //  (payload && payload.startsWith('AddGroup_1'))
         (updateText && updateText.startsWith('AddGroup_1'))
     ) {
+        const updateId = (ctx.update as any)?.message?.from?.id
         await dbConnect()
         console.log('grouppp')
         const user = await User.findOne({ telegramId: updateId }).select('_id role');
@@ -167,7 +242,6 @@ bot.on('pre_checkout_query', async (ctx) => {
 // برای اعمال دسترسی یا ارسال پیام خوش‌آمد پس از موفقیت پرداخت.
 
 bot.on('successful_payment', async (ctx) => {
-
 
     // // ایدی کاربر در بله
     const userId = ctx.chat.id
@@ -237,10 +311,11 @@ bot.on('successful_payment', async (ctx) => {
 
 });
 
+
 // هندلر پیام‌های متنی
 bot.on('text', async (ctx) => {
     await dbConnect();
-
+    console.log(ctx, 'text on')
     const telegramId = ctx.chat.id;
     const text = ctx.message.text?.trim() || '';
 
@@ -459,65 +534,65 @@ bot.command('cancel', async (ctx) => {
 
 // دریافت تصویر رسید
 bot.on('photo', async (ctx) => {
-    try {
-        await dbConnect()
-        // telegramId karbar
-        const userId = ctx.from?.id?.toString(); // تبدیل به string
-        const photos = ctx.message?.photo;
+    // try {
+    //     await dbConnect()
+    //     // telegramId karbar
+    //     const userId = ctx.from?.id?.toString(); // تبدیل به string
+    //     const photos = ctx.message?.photo;
 
-        if (!photos || photos.length === 0) return;
+    //     if (!photos || photos.length === 0) return;
 
-        // دریافت بهترین کیفیت تصویر
-        const photo = photos[photos.length - 1];
-        const fileId = photo.file_id;
+    //     // دریافت بهترین کیفیت تصویر
+    //     const photo = photos[photos.length - 1];
+    //     const fileId = photo.file_id;
 
-        // دریافت اطلاعات کاربر از دیتابیس
-        const UserInfo = await User.findOne({ telegramId: userId }).select('role _id firstName')
-        if (UserInfo.role === 'none') return
-        const userBuilding = await BuildingMember.findOne({ userId: UserInfo._id }).select('buildingId');
+    //     // دریافت اطلاعات کاربر از دیتابیس
+    //     const UserInfo = await User.findOne({ telegramId: userId }).select('role _id firstName')
+    //     if (UserInfo.role === 'none') return
+    //     const userBuilding = await BuildingMember.findOne({ userId: UserInfo._id }).select('buildingId');
 
-        if (!userBuilding) {
-            return ctx.reply('❌ شما عضو هیچ ساختمانی نیستید');
-        }
+    //     if (!userBuilding) {
+    //         return ctx.reply('❌ شما عضو هیچ ساختمانی نیستید');
+    //     }
 
-        // دریافت متن همراه (اگر وجود داشته باشد)
-        const caption = ctx.message?.caption || '';
+    //     // دریافت متن همراه (اگر وجود داشته باشد)
+    //     const caption = ctx.message?.caption || '';
 
-        // استخراج مبلغ از کپشن (اختیاری)
-        const amount = extractAmountFromCaption(caption);
+    //     // استخراج مبلغ از کپشن (اختیاری)
+    //     const amount = extractAmountFromCaption(caption);
 
-        // ذخیره رسید در دیتابیس
-        const payment = await saveReceiptToBale({
-            userId,
-            buildingId: userBuilding.buildingId,
-            fileId,
-            caption,
-            chatId: ctx.chat?.id,
-            amount,
+    // ذخیره رسید در دیتابیس
+    // const payment = await saveReceiptToBale({
+    //     userId,
+    //     buildingId: userBuilding.buildingId,
+    //     fileId,
+    //     caption,
+    //     chatId: ctx.chat?.id,
+    //     amount,
 
-        });
+    // });
 
-        await ctx.reply(
-            '✅ *رسید شما با موفقیت ثبت شد*\n\n'
-            + `📋 کد پیگیری: ${payment._id}\n`
-            + '⏳ پس از تایید ادمین به شما اطلاع داده خواهد شد.',
-            { parse_mode: 'Markdown' }
-        );
+    //     await ctx.reply(
+    //         '✅ *رسید شما با موفقیت ثبت شد*\n\n'
+    //         // + `📋 کد پیگیری: ${payment._id}\n`
+    //         + '⏳ پس از تایید ادمین به شما اطلاع داده خواهد شد.',
+    //         { parse_mode: 'Markdown' }
+    //     );
 
-        // ارسال نوتیفیکیشن به ادمین‌ها
-        await sendTelegramNotification(userBuilding.buildingId, {
-            type: 'new_payment_receipt',
-            userId,
-            paymentId: payment._id,
-            fileId,
-        }, UserInfo.firstName
-        );
+    //     // ارسال نوتیفیکیشن به ادمین‌ها
+    //     await sendTelegramNotification(userBuilding.buildingId, {
+    //         type: 'new_payment_receipt',
+    //         userId,
+    //         paymentId: payment._id,
+    //         fileId,
+    //     }, UserInfo.firstName
+    //     );
 
 
-    } catch (error) {
-        console.error('Error in photo handler:', error);
-        await ctx.reply('❌ خطا در ثبت رسید. لطفاً دوباره تلاش کنید.');
-    }
+    // } catch (error) {
+    //     console.error('Error in photo handler:', error);
+    //     await ctx.reply('❌ خطا در ثبت رسید. لطفاً دوباره تلاش کنید.');
+    // }
 });
 
 // هندلر خطا

@@ -1,6 +1,6 @@
 // models/Transaction.ts
 import mongoose from 'mongoose';
-
+// تراکنش
 const TransactionSchema = new mongoose.Schema({
     userId: {
         type: String,
@@ -11,11 +11,14 @@ const TransactionSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Building',
         required: true,
+        index: true,
+
     },
     type: {
         type: String,
-        enum: ['deposit', 'withdrawal', 'payment', 'refund'],
+        enum: ['charge', 'electricity', 'water', 'Facilities', 'extra'], //Facilities= امکانات
         required: true,
+        index: true
     },
     amount: {
         type: Number,
@@ -33,14 +36,8 @@ const TransactionSchema = new mongoose.Schema({
         type: String,
         enum: ['bale_wallet', 'card', 'bank_transfer'],
     },
-    chargeId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'MonthlyCharge',
-    },
-    paymentId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Payment',
-    },
+
+
     metadata: mongoose.Schema.Types.Mixed,
     completedAt: Date,
     failedAt: Date,

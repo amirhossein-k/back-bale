@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 const WalletSchema = new mongoose.Schema({
     userId: {
-        type: String,
+        type: String, //telegramId
         required: true,
         unique: true,
         index: true,
@@ -14,7 +14,7 @@ const WalletSchema = new mongoose.Schema({
         required: true,
     },
     balance: {
-        type: Number,
+        type: Number,  // موجودی به ریال
         default: 0,
         min: 0,
     },
@@ -34,6 +34,11 @@ const WalletSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: Date.now,
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'completed', 'failed'],
+        default: 'pending',
     },
 });
 

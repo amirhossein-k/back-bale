@@ -1,7 +1,8 @@
-// components/user/UserCharge.tsx
+// src\components\BaleUI\ChargeManager\UserCharge.tsx
+"use client";
 import React, { useState, useEffect } from "react";
 
-const UserCharge = ({
+export const UserCharge = ({
   buildingId,
   userId,
 }: {
@@ -41,7 +42,7 @@ const UserCharge = ({
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 bg-[#a0ceff] text-black rounded-md">
       <h2 className="text-xl font-bold mb-4">وضعیت شارژ من</h2>
 
       <div className="space-y-4">
