@@ -7,14 +7,13 @@ import { authOptions } from '@/lib/auth';
 // DELETE: حذف هزینه
 export async function DELETE(
        req: NextRequest,
-       { params }: { params: { id: string } }
-) {
+       { params }: { params: Promise<{ id: string }> }) {
        await dbConnect();
        const searchParams = req.nextUrl.searchParams;
 
        const buildingId = searchParams.get('buildingId');
 
-       const { id } = params;
+       const { id } = await params;
        if (!id && !buildingId) {
               return NextResponse.json({ error: 'ID required & buildingId' }, { status: 400 });
        }
@@ -30,14 +29,13 @@ export async function DELETE(
 // PUT: ویرایش هزینه
 export async function PUT(
        req: NextRequest,
-       { params }: { params: { id: string } }
-) {
+       { params }: { params: Promise<{ id: string }> }) {
        await dbConnect();
 
        const searchParams = req.nextUrl.searchParams;
 
        const buildingId = searchParams.get('buildingId');
-       const { id } = params;
+       const { id } = await params;
        const body = await req.json();
        const { title, amount, category, description, date } = body;
 
